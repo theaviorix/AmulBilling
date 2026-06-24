@@ -23,10 +23,6 @@
     flex-shrink:0;
   }
   .header-left h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.2px;}
-  .header-left p{margin:2px 0 0;font-size:11px;opacity:.75;}
-  .storage-dot{width:8px;height:8px;border-radius:50%;background:#69db7c;display:inline-block;margin-right:5px;flex-shrink:0;}
-  .storage-dot.warn{background:#ffd43b;}
-  #storage-badge{font-size:11px;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:4px;white-space:nowrap;}
 
   /* ── MAIN SCROLL AREA ── */
   main{flex:1;overflow-y:auto;padding:14px 12px calc(var(--nav-h) + 14px);max-width:480px;margin:0 auto;width:100%;}
@@ -93,15 +89,15 @@
   .rta-date{font-size:10px;color:var(--muted);margin-top:1px;}
 
   /* ── QUICK ACTIONS (dashboard bottom) ── */
-  .quick-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
   .qa-btn{
     background:#f0f4ff;border:1.5px solid #c5d0f5;border-radius:12px;
-    padding:14px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:16px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;
     cursor:pointer;transition:background .15s;
   }
   .qa-btn:hover{background:#dde5ff;}
-  .qa-icon{font-size:20px;line-height:1;}
-  .qa-label{font-size:11px;font-weight:600;color:var(--primary);text-align:center;line-height:1.2;}
+  .qa-icon{font-size:22px;line-height:1;}
+  .qa-label{font-size:12px;font-weight:600;color:var(--primary);text-align:center;line-height:1.2;}
 
   /* ── TABLE ── */
   .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
@@ -219,7 +215,6 @@
 <header>
   <div class="header-left">
     <h1>Order &amp; Billing</h1>
-    <p id="storage-badge">Loading…</p>
   </div>
 </header>
 
@@ -233,7 +228,6 @@
 /* ============== STATE ============== */
 var state = { products: [], customers: [], transactions: [] };
 var STORAGE_KEY = 'supplier-app-state-v2';
-var storageOK = false;
 
 var activeTab = 'dashboard';
 var editingProductId = null;
@@ -242,7 +236,7 @@ var editingCustomerDetail = false;
 var activePanel = null;
 var draftGaveItems = [];
 var editingTxnId = null;
-var pendingImageData = null; // base64 for new transaction image
+var pendingImageData = null;
 
 /* ============== HELPERS ============== */
 function genId(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -287,13 +281,12 @@ function avatarInitials(name){
 
 /* ============== PERSISTENCE ============== */
 function loadState(){
-  if (!window.storage) { storageOK = false; return Promise.resolve(); }
+  if (!window.storage) return Promise.resolve();
   return window.storage.get(STORAGE_KEY, false).then(function(res){
-    storageOK = true;
     if (res && res.value) {
       try { state = JSON.parse(res.value); } catch (e) {}
     }
-  }).catch(function(){ storageOK = true; });
+  }).catch(function(){});
 }
 function saveState(){
   if (!window.storage) return;
@@ -313,12 +306,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // Load state while splash shows
   loadState().then(function(){
-    var badge = document.getElementById('storage-badge');
-    if (storageOK) {
-      badge.innerHTML = '<span class="storage-dot"></span>Data saves automatically';
-    } else {
-      badge.innerHTML = '<span class="storage-dot warn"></span>Open in Claude.ai to save';
-    }
     render();
     // Fade out splash after 1.8s total
     setTimeout(function(){
@@ -332,8 +319,7 @@ document.addEventListener('DOMContentLoaded', function(){
 var TABS = [
   { key: 'dashboard', label: 'Home',      icon: '🏠' },
   { key: 'products',  label: 'Products',  icon: '📦' },
-  { key: 'customers', label: 'Customers', icon: '👥' },
-  { key: 'reports',   label: 'Reports',   icon: '📊' }
+  { key: 'customers', label: 'Customers', icon: '👥' }
 ];
 
 function switchTab(key){
@@ -355,7 +341,6 @@ function render(){
   var main = document.getElementById('main-content');
   if (activeTab === 'dashboard') main.innerHTML = renderDashboardTab();
   else if (activeTab === 'products') main.innerHTML = renderProductsTab();
-  else if (activeTab === 'reports') main.innerHTML = renderReportsTab();
   else main.innerHTML = viewingCustomerId ? renderCustomerDetail() : renderCustomersTab();
 }
 
@@ -445,9 +430,6 @@ function renderDashboardTab(){
         '</button>' +
         '<button class="qa-btn" onclick="switchTab(\'customers\')">' +
           '<span class="qa-icon">👤</span><span class="qa-label">Manage Customers</span>' +
-        '</button>' +
-        '<button class="qa-btn" onclick="switchTab(\'reports\')">' +
-          '<span class="qa-icon">📊</span><span class="qa-label">View Reports</span>' +
         '</button>' +
       '</div>' +
     '</div>' +
@@ -698,7 +680,7 @@ function renderGavePanel(){
     inner = '<p class="empty">No products yet. <a onclick="switchTab(\'products\')" style="color:var(--primary);cursor:pointer;">Add a product first</a>.</p>';
   } else {
     var opts = state.products.map(function(p){
-      return '<option value="' + p.id + '">' + esc(p.name) + ' — ₹' + Number(p.price).toFixed(2) + '</option>';
+      return '<option value="' + p.id + '">' + esc(p.name) + '</option>';
     }).join('');
     var itemsHtml = '';
     var totalPaise = 0;
@@ -994,7 +976,7 @@ function shareCustomerSummary(customerId){
         y += rowHeight; ctx.fillStyle = '#1f2430';
         ctx.fillText(fmtDateShort(t.date), 20, y); ctx.fillText(t.type === 'gave' ? 'You Gave' : 'You Got', 110, y);
         var detail = t.type === 'gave' ? t.items.map(function(i){ return i.name + ' x' + i.qty; }).join(', ') : (t.note || '-');
-        if (detail.length > 26) detail = detail.slice(0, 24) + '…';
+        if (detail.length > 26) detail = detail.slice(0, 24) + '\u2026';
         ctx.fillText(detail, 200, y);
         ctx.fillStyle = t.type === 'gave' ? '#dc2626' : '#16a34a';
         ctx.font = 'bold 11px Arial';
@@ -1008,19 +990,50 @@ function shareCustomerSummary(customerId){
     var balLabel = bal > 0 ? 'Balance: Customer owes ' + paiseToDisplay(bal) : (bal < 0 ? 'Balance: You owe ' + paiseToDisplay(Math.abs(bal)) : 'Balance: Settled up');
     ctx.font = 'bold 15px Arial'; ctx.fillStyle = bal > 0 ? '#16a34a' : (bal < 0 ? '#dc2626' : '#1f2430');
     ctx.fillText(balLabel, 20, footerY);
+
     canvas.toBlob(function(blob){
       if (!blob) { fallbackShareText(customer, txns, bal); return; }
       var safeName = customer.name.replace(/[^a-z0-9]+/gi, '_');
       var file = new File([blob], 'summary-' + safeName + '.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: 'Transaction Summary - ' + customer.name }).catch(function(){});
-      } else {
+      var phone = customer.phone ? customer.phone.replace(/\D/g, '') : '';
+      // Ensure Indian numbers have country code
+      if (phone && phone.length === 10) phone = '91' + phone;
+
+      // Build WhatsApp text summary
+      var waLines = ['*Transaction Summary — ' + customer.name + '*'];
+      txns.forEach(function(t){
+        var detail = t.type === 'gave' ? t.items.map(function(i){ return i.name + ' x' + i.qty; }).join(', ') : (t.note || '');
+        waLines.push(fmtDateShort(t.date) + ' | ' + (t.type === 'gave' ? 'You Gave' : 'You Got') + ' | ' + detail + ' | ' + (t.type === 'gave' ? '-' : '+') + paiseToDisplay(t.amountPaise));
+      });
+      waLines.push('*' + balLabel + '*');
+      var waText = waLines.join('\n');
+
+      function openWhatsApp(){
+        var waUrl = 'https://wa.me/' + (phone || '') + '?text=' + encodeURIComponent(waText);
+        window.open(waUrl, '_blank');
+      }
+
+      function saveImage(){
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a'); a.href = url; a.download = file.name;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-        alert('Image downloaded. You can now share it from your photos/files app.');
       }
+
+      // Try native share (supports image + direct app picker on mobile)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'Transaction Summary - ' + customer.name, text: waText })
+          .catch(function(err){
+            // User cancelled or share failed — offer WhatsApp fallback
+            if (err.name !== 'AbortError') {
+              if (phone) { openWhatsApp(); } else { saveImage(); }
+            }
+          });
+        return;
+      }
+
+      // No native share — show share options modal
+      showShareModal(customer, phone, openWhatsApp, saveImage);
     }, 'image/png');
   } catch (e) {
     var c2 = state.customers.find(function(c){ return c.id === customerId; });
@@ -1029,6 +1042,28 @@ function shareCustomerSummary(customerId){
     fallbackShareText(c2, t2, b2);
   }
 }
+
+function showShareModal(customer, phone, openWhatsApp, saveImage){
+  var existing = document.getElementById('share-modal');
+  if (existing) existing.remove();
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'share-modal';
+  var btns = '';
+  if (phone) {
+    btns += '<button class="btn btn-primary btn-sm" style="background:#25D366;border-color:#25D366;" onclick="document.getElementById(\'share-modal\').remove();(' + openWhatsApp.toString() + ')();">💬 WhatsApp</button>';
+  }
+  btns += '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'share-modal\').remove();(' + saveImage.toString() + ')();">💾 Save Image</button>';
+  btns += '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'share-modal\').remove()">Cancel</button>';
+  modal.innerHTML =
+    '<div class="modal-box" style="text-align:center;">' +
+      '<p class="modal-title">📤 Share Summary</p>' +
+      '<p style="font-size:13px;color:#555;margin:0 0 18px;">' + (phone ? 'Send to <strong>' + esc(customer.name) + '</strong> on WhatsApp, or save the image.' : 'No phone number saved. Save the image and share from your gallery.') + '</p>' +
+      '<div class="modal-actions" style="justify-content:center;flex-wrap:wrap;">' + btns + '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+}
+
 function fallbackShareText(customer, txns, bal){
   if (!customer) return;
   var lines = ['Transaction Summary — ' + customer.name];
@@ -1039,45 +1074,8 @@ function fallbackShareText(customer, txns, bal){
   lines.push('Balance: ' + paiseToDisplay(bal));
   var text = lines.join('\n');
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function(){ alert('Could not create image. Summary copied as text instead.'); }).catch(function(){ prompt('Copy this summary:', text); });
+    navigator.clipboard.writeText(text).then(function(){ alert('Summary copied as text.'); }).catch(function(){ prompt('Copy this summary:', text); });
   } else { prompt('Copy this summary:', text); }
-}
-
-/* ====================================================
-   REPORTS TAB
-==================================================== */
-function renderReportsTab(){
-  var statsHtml = '<div class="card"><h2>Reports</h2>' +
-    '<div class="balance-row">' +
-      '<div class="balance-tile give"><div class="bt-label">You Gave</div><div class="bt-amount">' + paiseToDisplay(totalGavePaise()) + '</div></div>' +
-      '<div class="balance-tile get"><div class="bt-label">You Received</div><div class="bt-amount">' + paiseToDisplay(totalGotPaise()) + '</div></div>' +
-    '</div>' +
-    '<div class="mini-stats">' +
-      '<div class="mini-stat"><div class="ms-num">' + state.customers.length + '</div><div class="ms-label">Customers</div></div>' +
-      '<div class="mini-stat"><div class="ms-num">' + state.products.length + '</div><div class="ms-label">Products</div></div>' +
-    '</div>' +
-  '</div>';
-
-  var tableHtml;
-  if (!state.customers.length) {
-    tableHtml = '<div class="card"><p class="empty">No customers yet.</p></div>';
-  } else {
-    var sorted = state.customers.slice().sort(function(a, b){ return customerBalancePaise(b.id) - customerBalancePaise(a.id); });
-    var items = sorted.map(function(c){
-      var bal = customerBalancePaise(c.id);
-      var initials = avatarInitials(c.name);
-      return '<div class="recent-txn-item" onclick="openCustomerDetail(\'' + c.id + '\')" style="cursor:pointer;">' +
-        '<div class="rta-avatar ' + (bal >= 0 ? 'gave' : 'got') + '">' + esc(initials) + '</div>' +
-        '<div class="rta-body"><div class="rta-name">' + esc(c.name) + '</div></div>' +
-        '<div class="rta-right">' +
-          '<div class="rta-amount ' + (bal > 0 ? 'gave' : (bal < 0 ? 'got' : '')) + '">' + paiseToDisplay(bal) + '</div>' +
-          '<div class="rta-date">→</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-    tableHtml = '<div class="card"><h3>Customer Balances</h3>' + items + '</div>';
-  }
-  return statsHtml + tableHtml;
 }
 
 /* ====================================================
