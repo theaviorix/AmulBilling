@@ -141,8 +141,8 @@
   .balance-box.zero{background:#f0f2f5;}
   .balance-label{font-size:13px;color:var(--muted);margin-bottom:4px;}
   .balance-amount{font-size:30px;font-weight:800;letter-spacing:-.5px;}
-  .balance-box.pos .balance-amount{color:var(--success);}
-  .balance-box.neg .balance-amount{color:var(--danger);}
+  .balance-box.pos .balance-amount{color:var(--danger);}
+  .balance-box.neg .balance-amount{color:var(--success);}
   .gave-got-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .btn-gave{background:var(--danger);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;width:100%;}
   .btn-got{background:var(--success);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;width:100%;}
@@ -944,8 +944,6 @@ function saveEditGaveTxn(txnId){
 /* ====================================================
    SHARE AS TEXT (WhatsApp / Copy)
 ==================================================== */
-var _sharePending = null;
-
 function shareCustomerSummary(customerId){
   var customer = state.customers.find(function(c){ return c.id === customerId; });
   if (!customer) return;
@@ -958,23 +956,25 @@ function shareCustomerSummary(customerId){
     ? 'Balance: Customer owes ' + paiseToDisplay(bal)
     : (bal < 0 ? 'Balance: You owe ' + paiseToDisplay(Math.abs(bal)) : 'Balance: Settled up');
 
-  var phone = customer.phone ? customer.phone.replace(/\D/g, '') : '';
-  if (phone.length === 10) phone = '91' + phone;
-
-  // Build canvas image
   try {
     var width = 600, rowHeight = 28, headerHeight = 140, footerHeight = 60;
     var height = headerHeight + Math.max(txns.length, 1) * rowHeight + footerHeight;
     var canvas = document.createElement('canvas');
     canvas.width = width; canvas.height = height;
     var ctx = canvas.getContext('2d');
+
+    // Background
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, width, height);
+
+    // Header
     ctx.fillStyle = '#1f2430'; ctx.font = 'bold 20px Arial';
     ctx.fillText('Transaction Summary', 20, 32);
     ctx.font = '13px Arial'; ctx.fillStyle = '#555';
     ctx.fillText('Customer: ' + customer.name, 20, 56);
     if (customer.phone) ctx.fillText('Phone: ' + customer.phone, 20, 74);
     ctx.fillText('Generated: ' + new Date().toLocaleDateString('en-IN'), 20, 92);
+
+    // Table header
     var tableTop = 110;
     ctx.strokeStyle = '#ddd'; ctx.beginPath(); ctx.moveTo(20, tableTop); ctx.lineTo(width - 20, tableTop); ctx.stroke();
     ctx.font = 'bold 12px Arial'; ctx.fillStyle = '#1f2430';
@@ -983,6 +983,8 @@ function shareCustomerSummary(customerId){
     ctx.fillText('Details', 220, tableTop + 18);
     ctx.fillText('Amount', width - 100, tableTop + 18);
     ctx.strokeStyle = '#bbb'; ctx.beginPath(); ctx.moveTo(20, tableTop + 24); ctx.lineTo(width - 20, tableTop + 24); ctx.stroke();
+
+    // Rows
     var y = tableTop + 24; ctx.font = '11px Arial';
     if (!txns.length) {
       y += 24; ctx.fillStyle = '#888'; ctx.fillText('No transactions yet.', 20, y);
@@ -1002,91 +1004,27 @@ function shareCustomerSummary(customerId){
         ctx.font = '11px Arial';
       });
     }
+
+    // Footer balance
     var footerY = y + 38;
     ctx.strokeStyle = '#bbb'; ctx.beginPath(); ctx.moveTo(20, footerY - 18); ctx.lineTo(width - 20, footerY - 18); ctx.stroke();
     ctx.font = 'bold 15px Arial';
     ctx.fillStyle = bal > 0 ? '#dc2626' : (bal < 0 ? '#16a34a' : '#1f2430');
     ctx.fillText(balLabel, 20, footerY);
 
+    // Save directly
     var dataUrl = canvas.toDataURL('image/png');
-    canvas.toBlob(function(blob){
-      _sharePending = { blob: blob, dataUrl: dataUrl, phone: phone, safeName: customer.name.replace(/[^a-z0-9]+/gi, '_'), customer: customer };
-      _showShareModal(customer, phone, !!blob);
-    }, 'image/png');
+    var safeName = customer.name.replace(/[^a-z0-9]+/gi, '_');
+    var a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'summary-' + safeName + '.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
   } catch(e) {
-    _sharePending = { blob: null, dataUrl: null, phone: phone, safeName: customer.name.replace(/[^a-z0-9]+/gi, '_'), customer: customer };
-    _showShareModal(customer, phone, false);
+    alert('Could not generate image. Please try again.');
   }
-}
-
-function _showShareModal(customer, phone, hasImage){
-  var existing = document.getElementById('share-modal');
-  if (existing) existing.remove();
-  var modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'share-modal';
-
-  // Check if native file share is supported (required for image-to-WhatsApp)
-  var canNativeShare = false;
-  if (hasImage && _sharePending && _sharePending.blob) {
-    try {
-      var testFile = new File([_sharePending.blob], 'test.png', { type: 'image/png' });
-      canNativeShare = !!(navigator.canShare && navigator.canShare({ files: [testFile] }));
-    } catch(e) {}
-  }
-
-  var desc, btns = '';
-  if (canNativeShare) {
-    // Best case: native share sheet — user picks WhatsApp, Telegram, etc.
-    desc = 'Tap below to share the summary image. Pick WhatsApp' + (phone ? ' to send to ' + esc(customer.name) : '') + ' or any other app.';
-    btns += '<button class="btn btn-sm" style="background:#25D366;border-color:#1ebe57;color:#fff;font-weight:700;width:100%;font-size:15px;padding:13px;" onclick="_doNativeShare()">📤 Share Image (WhatsApp / Any App)</button>';
-  } else if (hasImage) {
-    // No native share — save image, user shares manually from gallery
-    desc = phone
-      ? 'Save the image, then open WhatsApp and send it to <strong>' + esc(customer.name) + '</strong>.'
-      : 'Save the image to your device, then share from your gallery.';
-    btns += '<button class="btn btn-sm" style="background:#25D366;border-color:#1ebe57;color:#fff;font-weight:700;width:100%;font-size:15px;padding:13px;" onclick="_doSaveImage()">💾 Save Image to Device</button>';
-  } else {
-    desc = 'Could not generate image. Try again.';
-  }
-  btns += '<button class="btn btn-secondary btn-sm" style="width:100%;margin-top:6px;" onclick="document.getElementById(\'share-modal\').remove()">Cancel</button>';
-
-  modal.innerHTML =
-    '<div class="modal-box" style="text-align:center;">' +
-      '<p class="modal-title">📤 Share Summary</p>' +
-      '<p style="font-size:13px;color:#555;margin:0 0 18px;line-height:1.5;">' + desc + '</p>' +
-      '<div style="display:flex;flex-direction:column;gap:6px;">' + btns + '</div>' +
-    '</div>';
-  document.body.appendChild(modal);
-}
-
-function _closeShareModal(){ var m = document.getElementById('share-modal'); if (m) m.remove(); }
-
-function _doNativeShare(){
-  _closeShareModal();
-  if (!_sharePending || !_sharePending.blob) return;
-  var p = _sharePending;
-  var file = new File([p.blob], 'summary-' + p.safeName + '.png', { type: 'image/png' });
-  navigator.share({ files: [file], title: 'Transaction Summary — ' + p.customer.name })
-    .catch(function(err){
-      // User cancelled = fine. Anything else = fallback to download
-      if (err.name !== 'AbortError') _downloadImage(p);
-    });
-}
-
-function _doSaveImage(){
-  _closeShareModal();
-  if (!_sharePending) return;
-  _downloadImage(_sharePending);
-}
-
-function _downloadImage(p){
-  var a = document.createElement('a');
-  a.href = p.dataUrl;
-  a.download = 'summary-' + p.safeName + '.png';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
 }
 
 /* ====================================================
