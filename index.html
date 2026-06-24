@@ -281,16 +281,16 @@ function avatarInitials(name){
 
 /* ============== PERSISTENCE ============== */
 function loadState(){
-  if (!window.storage) return Promise.resolve();
-  return window.storage.get(STORAGE_KEY, false).then(function(res){
-    if (res && res.value) {
-      try { state = JSON.parse(res.value); } catch (e) {}
-    }
-  }).catch(function(){});
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch(e) {}
+  return Promise.resolve();
 }
 function saveState(){
-  if (!window.storage) return;
-  window.storage.set(STORAGE_KEY, JSON.stringify(state), false).catch(function(e){ console.error('Save failed', e); });
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch(e) { console.error('Save failed', e); }
 }
 
 /* ============== INIT ============== */
