@@ -136,8 +136,8 @@
   .cust-detail-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-top:10px;}
   .cust-detail-header h2{margin-bottom:2px;}
   .balance-box{border-radius:14px;padding:20px;text-align:center;margin:14px 0;}
-  .balance-box.pos{background:var(--got-bg);}
-  .balance-box.neg{background:var(--gave-bg);}
+  .balance-box.pos{background:var(--gave-bg);}
+  .balance-box.neg{background:var(--got-bg);}
   .balance-box.zero{background:#f0f2f5;}
   .balance-label{font-size:13px;color:var(--muted);margin-bottom:4px;}
   .balance-amount{font-size:30px;font-weight:800;letter-spacing:-.5px;}
@@ -589,7 +589,7 @@ function renderCustomerDetail(){
             ' &nbsp;·&nbsp; <a onclick="startEditCustomerDetail()" style="color:var(--primary);cursor:pointer;">Edit</a>' +
             ' &nbsp;·&nbsp; <a onclick="deleteCustomerFromDetail()" style="color:var(--danger);cursor:pointer;">Delete</a></p>' +
         '</div>' +
-        '<button class="btn btn-secondary btn-sm" onclick="shareCustomerSummary(\'' + customer.id + '\')">📤 Share</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="shareCustomerSummary(\'' + customer.id + '\')">⬇️ Download</button>' +
       '</div>';
   }
 
@@ -1012,15 +1012,18 @@ function shareCustomerSummary(customerId){
     ctx.fillStyle = bal > 0 ? '#dc2626' : (bal < 0 ? '#16a34a' : '#1f2430');
     ctx.fillText(balLabel, 20, footerY);
 
-    // Save directly
-    var dataUrl = canvas.toDataURL('image/png');
+    // Download as PNG automatically
     var safeName = customer.name.replace(/[^a-z0-9]+/gi, '_');
-    var a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'summary-' + safeName + '.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    canvas.toBlob(function(blob){
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'summary-' + safeName + '.png';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
+    }, 'image/png');
 
   } catch(e) {
     alert('Could not generate image. Please try again.');
