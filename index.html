@@ -216,6 +216,11 @@ details[open] .sum-chev{transform:rotate(180deg)}
 .kb-txn-actions{display:flex;gap:12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .kb-txn-edit{background:none;border:none;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;padding:0}
 .kb-txn-del{background:none;border:none;color:var(--red);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;padding:0}
+.kb-share-stmt-btn{background:var(--blue-l);border:1.5px solid #c0d8ff;color:var(--blue);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
+.kb-share-stmt-btn:active{background:#c0d8ff}
+.bill-pdf-btn{display:flex;align-items:center;gap:6px;background:var(--blue-l);border:1.5px solid #c0d8ff;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:var(--blue);cursor:pointer;font-family:inherit;justify-content:center;transition:background .15s;width:100%}
+.bill-pdf-btn:active{background:#c0d8ff}
+.inv-btn-row{display:flex;gap:8px;margin-top:0}
 .kb-txn-items{margin-top:4px;font-size:11.5px;color:var(--text2);line-height:1.6}
 .kb-txn-items span{display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 6px;margin:2px 3px 2px 0;font-weight:600}
 
@@ -432,7 +437,10 @@ details[open] .sum-chev{transform:rotate(180deg)}
 
     <!-- TRANSACTIONS -->
     <div class="kb-txn-section">
-      <div class="kb-txn-label">Transaction History</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="kb-txn-label" style="margin-bottom:0">Transaction History</div>
+        <button class="kb-share-stmt-btn" onclick="shareLedgerPDF()">📤 Statement</button>
+      </div>
       <div id="kb-txn-list"></div>
     </div>
 
@@ -962,7 +970,8 @@ function renderBills(){
           <tr><th>Product</th><th>Qty</th><th>Rate</th><th>Total</th></tr>
           ${rows}
           <tr class="tr-total"><td colspan="3">Grand total</td><td>${fmt(grand)}</td></tr>
-        </table>${postBtn}
+        </table>
+        <div class="inv-btn-row">${postBtn}<button class="bill-pdf-btn" onclick="shareBillPDF(${oi})">📤 PDF</button></div>
       </div>
     </details>`;
   }).join('')+'</div>';
@@ -974,6 +983,170 @@ function filterBills(q){
   document.querySelectorAll('#invoicesContainer details').forEach(el=>{
     el.style.display=!q||el.dataset.cust.includes(q.toLowerCase())?'':'none';
   });
+}
+
+// ── PDF (jsPDF + autoTable) ───────────────────────────────────────────────────
+const JSPDF_CDN='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const AUTOTABLE_CDN='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js';
+
+function loadScript(src){
+  return new Promise((res,rej)=>{
+    if(document.querySelector(`script[src="${src}"]`)){res();return;}
+    const s=document.createElement('script');
+    s.src=src;s.onload=res;s.onerror=rej;
+    document.head.appendChild(s);
+  });
+}
+
+async function loadJsPDF(){
+  await loadScript(JSPDF_CDN);
+  await loadScript(AUTOTABLE_CDN);
+  return window.jspdf.jsPDF;
+}
+
+// helper: rupee symbol via fallback (jsPDF default font lacks ₹)
+const rs=n=>'Rs.'+parseFloat(n).toFixed(2);
+
+function pdfHeader(doc,title,subtitle){
+  doc.setFillColor(232,25,44);
+  doc.rect(0,0,210,18,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(11);doc.setFont('helvetica','bold');
+  doc.text('AmulCalc Ultra Pro',14,7.5);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text('Amul Distribution Manager',14,13);
+  doc.setTextColor(30,30,30);
+  doc.setFontSize(16);doc.setFont('helvetica','bold');
+  doc.text(title,14,28);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.setTextColor(100,100,100);
+  doc.text(subtitle,14,34);
+  doc.setTextColor(30,30,30);
+}
+
+async function shareLedgerPDF(){
+  const c=customers[activeCustIdx];
+  if(!c){showToast('No customer selected.');return;}
+  showToast('Generating PDF…');
+  let JsPDF;
+  try{JsPDF=await loadJsPDF();}
+  catch(e){showToast('Could not load PDF library. Check internet.');return;}
+
+  const doc=new JsPDF({unit:'mm',format:'a4'});
+  const bal=custBal(c);
+  const balTxt=bal===0?'Settled up — Rs.0.00':bal>0?'Customer owes '+rs(bal):'You owe customer '+rs(-bal);
+
+  pdfHeader(doc,'Account Statement','Generated: '+today());
+
+  // customer info box
+  doc.setFillColor(245,245,247);
+  doc.roundedRect(14,38,182,18,3,3,'F');
+  doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
+  doc.text(c.name,19,46.5);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);
+  doc.text((c.phone||'No phone')+' · '+c.ledger.length+' transaction'+(c.ledger.length!==1?'s':''),19,52);
+  doc.setFont('helvetica','bold');
+  const balColor=bal===0?[100,100,100]:bal>0?[232,25,44]:[26,158,95];
+  doc.setTextColor(...balColor);
+  doc.text(balTxt,196,46.5,{align:'right'});
+  doc.setTextColor(30,30,30);
+
+  if(!c.ledger.length){
+    doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(150,150,150);
+    doc.text('No transactions yet.',105,80,{align:'center'});
+  } else {
+    const rows=[...c.ledger].reverse().map(t=>{
+      const isGave=!!t.dr;
+      return [t.date,isGave?'You Gave':'You Got',t.note||'—',isGave?'-'+rs(t.dr):'+'+rs(t.cr)];
+    });
+    doc.autoTable({
+      startY:60,
+      head:[['Date','Type','Note','Amount']],
+      body:rows,
+      styles:{fontSize:9,cellPadding:3,font:'helvetica'},
+      headStyles:{fillColor:[232,25,44],textColor:255,fontStyle:'bold',fontSize:8.5},
+      columnStyles:{0:{cellWidth:48},1:{cellWidth:24},2:{cellWidth:70},3:{cellWidth:30,halign:'right'}},
+      alternateRowStyles:{fillColor:[250,250,252]},
+      didParseCell(data){
+        if(data.section==='body'&&data.column.index===1){
+          data.cell.styles.textColor=data.cell.raw==='You Gave'?[232,25,44]:[26,158,95];
+          data.cell.styles.fontStyle='bold';
+        }
+        if(data.section==='body'&&data.column.index===3){
+          data.cell.styles.textColor=data.cell.raw.startsWith('-')?[232,25,44]:[26,158,95];
+          data.cell.styles.fontStyle='bold';
+        }
+      },
+      margin:{left:14,right:14},
+    });
+  }
+
+  const pageH=doc.internal.pageSize.height;
+  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(180,180,180);
+  doc.text('AmulCalc Ultra Pro · Confidential',105,pageH-8,{align:'center'});
+
+  const fname='Statement-'+c.name.replace(/\s+/g,'_')+'.pdf';
+  doc.save(fname);
+  showToast('Downloaded: '+fname);
+}
+
+async function shareBillPDF(oi){
+  const o=orders[oi];
+  if(!o){showToast('Order not found.');return;}
+  showToast('Generating PDF…');
+  let JsPDF;
+  try{JsPDF=await loadJsPDF();}
+  catch(e){showToast('Could not load PDF library. Check internet.');return;}
+
+  const doc=new JsPDF({unit:'mm',format:'a4'});
+  const grand=calcGrand(o);
+
+  pdfHeader(doc,'Invoice','Order date: '+(o.date||'—'));
+
+  // customer + total banner
+  doc.setFillColor(255,240,240);
+  doc.roundedRect(14,38,182,18,3,3,'F');
+  doc.setFontSize(12);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
+  doc.text(o.custName,19,46.5);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);
+  doc.text(o.posted?'Status: Posted to Khatabook':'Status: Not yet posted',19,52);
+  doc.setFont('helvetica','bold');doc.setTextColor(232,25,44);
+  doc.setFontSize(13);
+  doc.text(rs(grand),196,46.5,{align:'right'});
+  doc.setFontSize(8);doc.setTextColor(180,100,100);
+  doc.text('Grand Total',196,52,{align:'right'});
+  doc.setTextColor(30,30,30);
+
+  const rows=o.items.map(item=>{
+    const price=parseFloat(item.prod.price)||0;
+    return [
+      item.prod.name+'\n'+item.prod.unit,
+      String(item.qty),
+      price?rs(price):'—',
+      price?rs(price*item.qty):'—'
+    ];
+  });
+
+  doc.autoTable({
+    startY:60,
+    head:[['Product','Qty','Rate','Total']],
+    body:rows,
+    foot:[['','','Grand Total',rs(grand)]],
+    styles:{fontSize:9,cellPadding:3,font:'helvetica'},
+    headStyles:{fillColor:[232,25,44],textColor:255,fontStyle:'bold',fontSize:8.5},
+    footStyles:{fillColor:[255,240,240],textColor:[232,25,44],fontStyle:'bold',fontSize:10},
+    columnStyles:{0:{cellWidth:90},1:{cellWidth:20,halign:'center'},2:{cellWidth:36,halign:'right'},3:{cellWidth:36,halign:'right'}},
+    alternateRowStyles:{fillColor:[250,250,252]},
+    margin:{left:14,right:14},
+  });
+
+  const pageH=doc.internal.pageSize.height;
+  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(180,180,180);
+  doc.text('AmulCalc Ultra Pro · Confidential',105,pageH-8,{align:'center'});
+
+  const fname='Invoice-'+o.custName.replace(/\s+/g,'_')+'.pdf';
+  doc.save(fname);
+  showToast('Downloaded: '+fname);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
