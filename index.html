@@ -1781,6 +1781,12 @@ onAuthStateChanged(auth, async (user) => {
     window._applyAppState();
     setSyncIndicator(false);
     setSubText('Dairy Billing & Dispatch');
+    // Reset auth screen so Sign In/Sign Up form is visible again
+    document.getElementById('authCard').style.display    = 'block';
+    document.getElementById('authLoading').style.display = 'none';
+    document.getElementById('authEmail').value           = '';
+    document.getElementById('authPassword').value        = '';
+    document.getElementById('authError').style.display   = 'none';
     window.showScreen('auth');
   }
 });
