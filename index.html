@@ -578,6 +578,24 @@ let builderItems=[];
 let activeCustIdx=-1;
 let manifestCleared=false;
 
+// ── FIREBASE BRIDGE ─────────────────────────────────────────────────────────
+// Shared state object written by the Firebase module, read by _applyAppState
+window._appState = {
+  customers: [], products: [], orders: [], bills: [], manifestCleared: false
+};
+// Called by Firebase module after loading cloud data — syncs into local vars & re-renders
+window._applyAppState = function() {
+  customers       = window._appState.customers;
+  products        = window._appState.products;
+  orders          = window._appState.orders;
+  bills           = window._appState.bills;
+  manifestCleared = window._appState.manifestCleared;
+  renderCustomers();
+  renderPrices();
+  populateSelects();
+  renderActiveOrders();
+};
+
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const ini=n=>n.split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);
 const fmt=n=>'₹'+parseFloat(n).toFixed(2);
@@ -1647,7 +1665,7 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
          signOut, onAuthStateChanged, sendPasswordResetEmail,
 }
                                     from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, enableIndexedDbPersistence }
+import { initializeFirestore, persistentLocalCache, doc, setDoc, getDoc, onSnapshot }
                                     from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -1662,10 +1680,7 @@ const firebaseConfig = {
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db       = getFirestore(app);
-
-// Enable offline persistence
-try { enableIndexedDbPersistence(db).catch(()=>{}); } catch(e) {}
+const db   = initializeFirestore(app, { localCache: persistentLocalCache() });
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 let _uid = null;
