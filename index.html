@@ -1643,6 +1643,11 @@ window.updatePriceCount=updatePriceCount;
 
       <div id="authError" style="color:var(--red);font-size:12px;margin-bottom:8px;display:none"></div>
 
+      <div id="rememberWrap" style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <input type="checkbox" id="rememberMe" checked style="width:16px;height:16px;accent-color:#0f0f10;cursor:pointer;flex-shrink:0">
+        <label for="rememberMe" style="font-size:13px;color:var(--text2);cursor:pointer;user-select:none">Remember me on this device</label>
+      </div>
+
       <button class="btn-auth" id="authSubmitBtn" onclick="doAuth()">Sign In</button>
 
       <div id="forgotWrap" style="text-align:center;margin-top:10px">
@@ -1663,6 +1668,7 @@ window.updatePriceCount=updatePriceCount;
 import { initializeApp }            from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
          signOut, onAuthStateChanged, sendPasswordResetEmail,
+         setPersistence, browserLocalPersistence, browserSessionPersistence,
 }
                                     from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, doc, setDoc, getDoc, onSnapshot }
@@ -1781,12 +1787,15 @@ onAuthStateChanged(auth, async (user) => {
     window._applyAppState();
     setSyncIndicator(false);
     setSubText('Dairy Billing & Dispatch');
-    // Reset auth screen so Sign In/Sign Up form is visible again
+    // Reset auth screen fully so Sign In/Sign Up form is visible and functional
     document.getElementById('authCard').style.display    = 'block';
     document.getElementById('authLoading').style.display = 'none';
     document.getElementById('authEmail').value           = '';
     document.getElementById('authPassword').value        = '';
     document.getElementById('authError').style.display   = 'none';
+    const btn = document.getElementById('authSubmitBtn');
+    btn.disabled    = false;
+    btn.textContent = 'Sign In';
     window.showScreen('auth');
   }
 });
@@ -1798,11 +1807,12 @@ window._cloudSave = async (data) => {
 };
 
 window.doAuth = async function() {
-  const email    = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
-  const errEl    = document.getElementById('authError');
-  const btn      = document.getElementById('authSubmitBtn');
-  const isSignUp = document.getElementById('tabSignUp').classList.contains('active');
+  const email      = document.getElementById('authEmail').value.trim();
+  const password   = document.getElementById('authPassword').value;
+  const errEl      = document.getElementById('authError');
+  const btn        = document.getElementById('authSubmitBtn');
+  const isSignUp   = document.getElementById('tabSignUp').classList.contains('active');
+  const rememberMe = document.getElementById('rememberMe').checked;
 
   errEl.style.display = 'none';
   if (!email || !password) { showAuthError('Please enter email and password.'); return; }
@@ -1812,11 +1822,18 @@ window.doAuth = async function() {
   btn.textContent = isSignUp ? 'Creating account…' : 'Signing in…';
 
   try {
+    // Set persistence BEFORE signing in
+    const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+    await setPersistence(auth, persistence);
+
     if (isSignUp) {
       await createUserWithEmailAndPassword(auth, email, password);
     } else {
       await signInWithEmailAndPassword(auth, email, password);
     }
+    // Success — onAuthStateChanged will take over; re-enable button defensively
+    btn.disabled = false;
+    btn.textContent = isSignUp ? 'Create Account' : 'Sign In';
   } catch(e) {
     btn.disabled = false;
     btn.textContent = isSignUp ? 'Create Account' : 'Sign In';
@@ -1847,6 +1864,7 @@ window.switchAuthTab = function(tab) {
   document.getElementById('authNameWrap').style.display = isSignUp ? 'block' : 'none';
   document.getElementById('authSubmitBtn').textContent  = isSignUp ? 'Create Account' : 'Sign In';
   document.getElementById('forgotWrap').style.display   = isSignUp ? 'none' : 'block';
+  document.getElementById('rememberWrap').style.display = isSignUp ? 'none' : 'flex';
   document.getElementById('authError').style.display    = 'none';
 };
 
