@@ -626,8 +626,8 @@ function runConfirmOk(){
 const STORAGE_KEY='amulcalc_ultra_pro_v1';
 function saveState(){
   const data={customers,products,orders,bills,manifestCleared};
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}catch(e){}
   if(window._cloudSave) window._cloudSave(data);
+  // localStorage intentionally skipped — per-user data lives in Firebase only
 }
 function loadState(){
   try{
@@ -635,7 +635,7 @@ function loadState(){
     if(!raw)return;
     const data=JSON.parse(raw);
     if(Array.isArray(data.customers))customers=data.customers;
-    if(Array.isArray(data.products)&&data.products.length)products=data.products;
+    if(Array.isArray(data.products))products=data.products;
     if(Array.isArray(data.orders))orders=data.orders;
     if(Array.isArray(data.bills))bills=data.bills;
     if(data.manifestCleared!==undefined)manifestCleared=data.manifestCleared;
@@ -1549,8 +1549,9 @@ window.switchAuthTab=function(t){
   document.getElementById('forgotWrap').style.display=t==='signup'?'none':'block';
   document.getElementById('authError').style.display='none';
 };
-// ── INIT ──────────────────────────────────────────────────────────────────────
-loadState();
+// ── INIT ────────────────────────────────────────────────────────────────────
+// Do NOT loadState() here — Firebase auth listener handles data loading per user
+// Just render empty state while waiting for auth
 renderCustomers();renderPrices();populateSelects();renderActiveOrders();
 
 // ── EXPOSE FUNCTIONS TO GLOBAL SCOPE (required for inline onclick handlers) ──
@@ -1707,31 +1708,34 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('authCard').style.display   = 'none';
     document.getElementById('authLoadingMsg').textContent = 'Loading your data…';
 
+    // Wipe state clean before loading this user's data
+    window._appState.customers      = [];
+    window._appState.products       = [];
+    window._appState.orders         = [];
+    window._appState.bills          = [];
+    window._appState.manifestCleared = false;
+
     const data = await cloudLoad();
     if (data) {
-      // Merge cloud data into app state
-      if (Array.isArray(data.customers))  window._appState.customers = data.customers;
-      if (Array.isArray(data.products) && data.products.length)
-                                          window._appState.products  = data.products;
-      if (Array.isArray(data.orders))     window._appState.orders    = data.orders;
-      if (Array.isArray(data.bills))      window._appState.bills     = data.bills;
-      if (data.manifestCleared !== undefined)
-                                          window._appState.manifestCleared = data.manifestCleared;
-      window._applyAppState();
+      // Load cloud data — always overwrite, even with empty arrays
+      if (Array.isArray(data.customers))   window._appState.customers       = data.customers;
+      if (Array.isArray(data.products))    window._appState.products        = data.products;
+      if (Array.isArray(data.orders))      window._appState.orders          = data.orders;
+      if (Array.isArray(data.bills))       window._appState.bills           = data.bills;
+      if (data.manifestCleared !== undefined) window._appState.manifestCleared = data.manifestCleared;
     }
+    window._applyAppState();
 
     // Subscribe to real-time updates
     if (_unsubscribe) _unsubscribe();
     _unsubscribe = onSnapshot(userDoc(), (snap) => {
       if (!snap.exists() || snap.metadata.hasPendingWrites) return;
       const data = snap.data();
-      if (Array.isArray(data.customers))  window._appState.customers = data.customers;
-      if (Array.isArray(data.products) && data.products.length)
-                                          window._appState.products  = data.products;
-      if (Array.isArray(data.orders))     window._appState.orders    = data.orders;
-      if (Array.isArray(data.bills))      window._appState.bills     = data.bills;
-      if (data.manifestCleared !== undefined)
-                                          window._appState.manifestCleared = data.manifestCleared;
+      if (Array.isArray(data.customers))   window._appState.customers       = data.customers;
+      if (Array.isArray(data.products))    window._appState.products        = data.products;
+      if (Array.isArray(data.orders))      window._appState.orders          = data.orders;
+      if (Array.isArray(data.bills))       window._appState.bills           = data.bills;
+      if (data.manifestCleared !== undefined) window._appState.manifestCleared = data.manifestCleared;
       window._applyAppState();
     }, () => {});
 
@@ -1753,6 +1757,13 @@ onAuthStateChanged(auth, async (user) => {
   } else {
     _uid = null;
     if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; }
+    // Wipe in-memory state so next user starts clean
+    window._appState.customers       = [];
+    window._appState.products        = [];
+    window._appState.orders          = [];
+    window._appState.bills           = [];
+    window._appState.manifestCleared = false;
+    window._applyAppState();
     setSyncIndicator(false);
     setSubText('Dairy Billing & Dispatch');
     window.showScreen('auth');
