@@ -570,18 +570,7 @@ details[open] .sum-chev{transform:rotate(180deg)}
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 let customers=[];
-let products=[
-  {key:'gold',      name:'Amul Gold Milk',   unit:'500ml',  sid:'Gold',      price:''},
-  {key:'taaza',     name:'Amul Taaza Milk',  unit:'500ml',  sid:'Taaza',     price:''},
-  {key:'butter100', name:'Amul Butter',       unit:'100g',   sid:'Butter100', price:''},
-  {key:'butter500', name:'Amul Butter',       unit:'500g',   sid:'Butter500', price:''},
-  {key:'cheese',    name:'Amul Cheese Block', unit:'200g',   sid:'Cheese',    price:''},
-  {key:'dahi400',   name:'Amul Dahi',         unit:'400g',   sid:'Dahi400',   price:''},
-  {key:'paneer200', name:'Amul Paneer',       unit:'200g',   sid:'Paneer',    price:''},
-  {key:'ghee500',   name:'Amul Ghee',         unit:'500ml',  sid:'Ghee500',   price:''},
-  {key:'kool',      name:'Amul Kool',         unit:'200ml',  sid:'Kool',      price:''},
-  {key:'icecream',  name:'Amul Ice Cream',    unit:'1L tub', sid:'IceCream',  price:''},
-];
+let products=[];
 let orders=[];
 let bills=[];
 let builderItems=[];
@@ -1653,7 +1642,8 @@ window.updatePriceCount=updatePriceCount;
 // ── FIREBASE SETUP ────────────────────────────────────────────────────────────
 import { initializeApp }            from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-         signOut, onAuthStateChanged, sendPasswordResetEmail }
+         signOut, onAuthStateChanged, sendPasswordResetEmail,
+}
                                     from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, enableIndexedDbPersistence }
                                     from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
@@ -1670,7 +1660,7 @@ const firebaseConfig = {
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db   = getFirestore(app);
+const db       = getFirestore(app);
 
 // Enable offline persistence
 try { enableIndexedDbPersistence(db).catch(()=>{}); } catch(e) {}
@@ -1845,7 +1835,7 @@ function friendlyError(code) {
     'auth/invalid-credential':  'Incorrect email or password.',
     'auth/network-request-failed': 'Network error. Check your connection.',
   };
-  return map[code] || 'Something went wrong. Please try again.';
+  return map[code] || 'Error: ' + code;
 }
 </script>
 
