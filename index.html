@@ -508,7 +508,7 @@ details[open] .sum-chev{transform:rotate(180deg)}
     <input class="m-input" type="number" id="nPPrice" placeholder="Price ₹">
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closePriceModal()">Cancel</button>
-      <button class="btn-save-red" onclick="confirmAddProduct()">Add</button>
+      <button class="btn-save-red" onclick="confirmAddProduct()" style="background:#0f0f10">Add</button>
     </div>
   </div>
 </div>
@@ -1206,7 +1206,7 @@ async function loadJsPDF(){
 const rs=n=>'Rs.'+parseFloat(n).toFixed(2);
 
 function pdfHeader(doc,title,subtitle){
-  doc.setFillColor(232,25,44);
+  doc.setFillColor(15,15,16);
   doc.rect(0,0,210,18,'F');
   // Amul logo image in header
   try{doc.addImage(AMUL_LOGO_B64,'WEBP',14,1,14,14,'','FAST');}catch(e){}
@@ -1386,7 +1386,6 @@ async function downloadManifestPDF(){
     startY:60,
     head:[['Product','Unit','Total Qty','Packing']],
     body:rows,
-    foot:[['','TOTAL',fmtQty(totalUnits),'']],
     styles:{fontSize:10,cellPadding:3,font:'helvetica'},
     headStyles:{fillColor:[26,158,95],textColor:255,fontStyle:'bold',fontSize:9},
     footStyles:{fillColor:[232,255,240],textColor:[10,100,50],fontStyle:'bold'},
@@ -1449,7 +1448,7 @@ async function downloadAllBillsPDF(){
   const pageW=297,pageH=210;
 
   // red header bar
-  doc.setFillColor(232,25,44);
+  doc.setFillColor(15,15,16);
   doc.rect(0,0,pageW,16,'F');
   try{doc.addImage(AMUL_LOGO_B64,'WEBP',14,1,14,14,'','FAST');}catch(e){}
   doc.setTextColor(255,255,255);
@@ -1518,12 +1517,6 @@ async function downloadAllBillsPDF(){
   });
 
   // product name sub-row below main table
-  const finalY=doc.lastAutoTable.finalY+3;
-  if(finalY<pageH-12){
-    doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(120,120,120);
-    const legend=prods.map(p=>`${p.sid}: ${p.name} ${p.unit}`).join('   ');
-    doc.text('Products: '+legend,margin,finalY,{maxWidth:available});
-  }
 
   doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(180,180,180);
   doc.text('Amul Billing · Dispatch Sheet · '+today(),pageW/2,pageH-4,{align:'center'});
