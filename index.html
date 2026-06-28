@@ -1703,56 +1703,56 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
     _uid = user.uid;
 
-    // Show loading spinner while fetching cloud data
+    // Show loading spinner
     document.getElementById('authLoading').style.display = 'block';
     document.getElementById('authCard').style.display   = 'none';
     document.getElementById('authLoadingMsg').textContent = 'Loading your data…';
 
-    // Wipe state clean before loading this user's data
-    window._appState.customers      = [];
-    window._appState.products       = [];
-    window._appState.orders         = [];
-    window._appState.bills          = [];
-    window._appState.manifestCleared = false;
-
-    const data = await cloudLoad();
-    if (data) {
-      // Load cloud data — always overwrite, even with empty arrays
-      if (Array.isArray(data.customers))   window._appState.customers       = data.customers;
-      if (Array.isArray(data.products))    window._appState.products        = data.products;
-      if (Array.isArray(data.orders))      window._appState.orders          = data.orders;
-      if (Array.isArray(data.bills))       window._appState.bills           = data.bills;
-      if (data.manifestCleared !== undefined) window._appState.manifestCleared = data.manifestCleared;
+    function applyData(data) {
+      window._appState.customers       = Array.isArray(data?.customers) ? data.customers : [];
+      window._appState.products        = Array.isArray(data?.products)  ? data.products  : [];
+      window._appState.orders          = Array.isArray(data?.orders)    ? data.orders    : [];
+      window._appState.bills           = Array.isArray(data?.bills)     ? data.bills     : [];
+      window._appState.manifestCleared = data?.manifestCleared ?? false;
     }
-    window._applyAppState();
 
-    // Subscribe to real-time updates
-    if (_unsubscribe) _unsubscribe();
-    _unsubscribe = onSnapshot(userDoc(), (snap) => {
-      if (!snap.exists() || snap.metadata.hasPendingWrites) return;
-      const data = snap.data();
-      if (Array.isArray(data.customers))   window._appState.customers       = data.customers;
-      if (Array.isArray(data.products))    window._appState.products        = data.products;
-      if (Array.isArray(data.orders))      window._appState.orders          = data.orders;
-      if (Array.isArray(data.bills))       window._appState.bills           = data.bills;
-      if (data.manifestCleared !== undefined) window._appState.manifestCleared = data.manifestCleared;
+    function enterApp() {
       window._applyAppState();
-    }, () => {});
+      setSubText('Synced · ' + (user.email || ''));
+      setSyncIndicator(true);
+      window.showScreen('main');
+      document.getElementById('authLoading').style.display = 'none';
+      document.getElementById('authCard').style.display    = 'block';
+    }
 
-    const email = user.email || '';
-    const name  = email.split('@')[0];
-    setSubText('Synced · ' + email);
-    setSyncIndicator(true);
+    // Use onSnapshot as the primary loader — fires immediately with current data
+    if (_unsubscribe) _unsubscribe();
+    let firstSnap = true;
+    _unsubscribe = onSnapshot(userDoc(), (snap) => {
+      const data = snap.exists() ? snap.data() : {};
+      applyData(data);
+      if (firstSnap) {
+        firstSnap = false;
+        enterApp();
+      } else if (!snap.metadata.hasPendingWrites) {
+        window._applyAppState();
+      }
+    }, (err) => {
+      // Snapshot failed (e.g. offline, rules) — still enter app with empty state
+      console.warn('Firestore snapshot error:', err);
+      applyData({});
+      if (firstSnap) { firstSnap = false; enterApp(); }
+    });
 
-    // Switch to main app
-    window.showScreen('main');
-    window.renderCustomers();
-    window.renderPrices();
-    window.populateSelects();
-    window.renderActiveOrders();
-
-    document.getElementById('authLoading').style.display = 'none';
-    document.getElementById('authCard').style.display    = 'block';
+    // Safety timeout — if snapshot hasn't fired in 6s, enter app anyway
+    setTimeout(() => {
+      if (firstSnap) {
+        firstSnap = false;
+        console.warn('Snapshot timeout — entering app with empty state');
+        applyData({});
+        enterApp();
+      }
+    }, 6000);
 
   } else {
     _uid = null;
