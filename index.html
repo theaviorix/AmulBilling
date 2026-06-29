@@ -1503,32 +1503,12 @@ async function downloadAllBillsPDF(){
 
   // ── Build table rows
   const DASH='—'; // em dash for empty cells
-  const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total','Dues']];
-  // Track dues per row (numeric) for footer sum
-  const rowDues=[];
+  const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total']];
 
   const body=bills.map(o=>{
     const qtyMap={};
     o.items.forEach(item=>qtyMap[item.prod.key]=item.qty);
     const grand=calcGrand(o);
-
-    // Khatabook due = customer's ledger balance BEFORE this bill.
-    // If the bill was already posted to ledger, custBal includes it —
-    // so subtract it back to show the pre-delivery outstanding balance.
-    const cust=customers.find(c=>c.name===o.custName);
-    const fullBal=cust?custBal(cust):0;
-    const due=o.posted?fullBal-grand:fullBal;
-
-    rowDues.push(due);
-
-    let dueStr;
-    if(due>0){
-      dueStr='Rs.'+due.toFixed(0);          // owes money  → red
-    } else if(due<0){
-      dueStr='Adv. Rs.'+Math.abs(due).toFixed(0);  // advance paid → green
-    } else {
-      dueStr=DASH;                           // settled → grey dash
-    }
 
     return [
       o.custName,
@@ -1537,11 +1517,10 @@ async function downloadAllBillsPDF(){
         return (q!=null&&q!==0)?fmtQty(q):DASH;
       }),
       'Rs.'+grand.toFixed(0),
-      dueStr,
     ];
   });
 
-  // ── Totals footer — sum only positive dues (what customers owe)
+  // ── Totals footer
   const footerQtys=prods.map(p=>{
     const t=bills.reduce((s,o)=>{
       const item=o.items.find(i=>i.prod.key===p.key);
@@ -1550,8 +1529,7 @@ async function downloadAllBillsPDF(){
     return t>0?fmtQty(t):DASH;
   });
   const grandTotal=bills.reduce((s,o)=>s+calcGrand(o),0);
-  const totalDues=rowDues.reduce((s,d)=>s+(d>0?d:0),0);
-  const foot=[['TOTAL',...footerQtys,'Rs.'+grandTotal.toFixed(0),totalDues>0?'Rs.'+totalDues.toFixed(0):DASH]];
+  const foot=[['TOTAL',...footerQtys,'Rs.'+grandTotal.toFixed(0)]];
 
   const doc=new JsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const pageW=297,pageH=210;
@@ -1572,12 +1550,10 @@ async function downloadAllBillsPDF(){
   const available=pageW-margin*2;
   const custColW=Math.min(48,available*0.20);
   const totalColW=22;
-  const duesColW=22;
-  const prodColW=Math.max(13,Math.min(21,(available-custColW-totalColW-duesColW)/Math.max(prods.length,1)));
+  const prodColW=Math.max(13,Math.min(21,(available-custColW-totalColW)/Math.max(prods.length,1)));
   const colStyles={0:{cellWidth:custColW,fontStyle:'bold'}};
   prods.forEach((_,i)=>{colStyles[i+1]={cellWidth:prodColW,halign:'center'};});
   colStyles[prods.length+1]={cellWidth:totalColW,halign:'right',fontStyle:'bold',textColor:[232,25,44]};
-  colStyles[prods.length+2]={cellWidth:duesColW,halign:'right',fontStyle:'bold'};
 
   doc.autoTable({
     startY:17,
@@ -1610,34 +1586,11 @@ async function downloadAllBillsPDF(){
     tableLineColor:[180,180,180],
     tableLineWidth:0.4,
     didParseCell(data){
-      const duesIdx=prods.length+2;
       // highlight ordered qty cells green
       if(data.section==='body'&&data.column.index>0&&data.column.index<=prods.length&&data.cell.raw!==DASH){
         data.cell.styles.fillColor=[232,255,240];
         data.cell.styles.textColor=[10,100,50];
         data.cell.styles.fontStyle='bold';
-      }
-      // highlight dues column: red=owed, green=advance, grey=settled
-      if(data.section==='body'&&data.column.index===duesIdx){
-        const raw=data.cell.raw||'';
-        if(raw.startsWith('Rs.')){
-          // customer owes money
-          data.cell.styles.fillColor=[255,235,235];
-          data.cell.styles.textColor=[180,20,20];
-          data.cell.styles.fontStyle='bold';
-        } else if(raw.startsWith('Adv.')){
-          // customer has advance credit
-          data.cell.styles.fillColor=[232,255,240];
-          data.cell.styles.textColor=[10,110,50];
-          data.cell.styles.fontStyle='bold';
-        } else {
-          // dash / settled
-          data.cell.styles.textColor=[180,180,180];
-        }
-      }
-      // style dues footer cell
-      if(data.section==='foot'&&data.column.index===duesIdx){
-        data.cell.styles.textColor=[180,20,20];
       }
     },
     didDrawCell(data){
