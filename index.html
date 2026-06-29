@@ -1439,44 +1439,61 @@ async function downloadAllBillsPDF(){
   try{JsPDF=await loadJsPDF();}
   catch(e){showToast('Could not load PDF library. Check internet.');return;}
 
-  // collect all unique products across all bills (in insertion order)
-  const prodMap=new Map();
-  bills.forEach(o=>o.items.forEach(item=>{
-    if(!prodMap.has(item.prod.key))prodMap.set(item.prod.key,item.prod);
-  }));
-  const prods=[...prodMap.values()];
+  // ── Products: follow the master products[] list order, include only those
+  //    that appear in at least one bill; blanks show as dash not empty
+  const orderedInBills=new Set();
+  bills.forEach(o=>o.items.forEach(item=>orderedInBills.add(item.prod.key)));
+  // Use products[] order as master; fall back to bill-insertion order for any
+  // product key not found in products[] (e.g. deleted products)
+  const masterKeys=products.map(p=>p.key);
+  const extraKeys=[...orderedInBills].filter(k=>!masterKeys.includes(k));
+  const prodKeys=[...masterKeys.filter(k=>orderedInBills.has(k)),...extraKeys];
+  // Build prod objects: prefer master products[] entry, else use bill item snapshot
+  const prodObjMap=new Map();
+  products.forEach(p=>prodObjMap.set(p.key,p));
+  bills.forEach(o=>o.items.forEach(item=>{if(!prodObjMap.has(item.prod.key))prodObjMap.set(item.prod.key,item.prod);}));
+  const prods=prodKeys.map(k=>prodObjMap.get(k));
 
-  // build table data
-  const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total']];
+  // ── Build table rows
+  const DASH='—'; // em dash for empty cells
+  const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total','Dues']];
   const body=bills.map(o=>{
     const qtyMap={};
     o.items.forEach(item=>qtyMap[item.prod.key]=item.qty);
     const grand=calcGrand(o);
+
+    // Khatabook due for this customer
+    const cust=customers.find(c=>c.name===o.custName);
+    const due=cust?custBal(cust):0;
+    const dueStr=due>0?'Rs.'+due.toFixed(0):(due<0?'Adv.':DASH);
+
     return [
       o.custName,
       ...prods.map(p=>{
         const q=qtyMap[p.key];
-        return q!=null?fmtQty(q):'';
+        return (q!=null&&q!==0)?fmtQty(q):DASH;
       }),
-      'Rs.'+grand.toFixed(0)
+      'Rs.'+grand.toFixed(0),
+      dueStr,
     ];
   });
 
-  // totals footer row
+  // ── Totals footer
   const footerQtys=prods.map(p=>{
     const t=bills.reduce((s,o)=>{
       const item=o.items.find(i=>i.prod.key===p.key);
       return s+(item?item.qty:0);
     },0);
-    return t>0?fmtQty(t):'';
+    return t>0?fmtQty(t):DASH;
   });
   const grandTotal=bills.reduce((s,o)=>s+calcGrand(o),0);
-  const foot=[['TOTAL',...footerQtys,'Rs.'+grandTotal.toFixed(0)]];
+  const totalDues=customers.reduce((s,c)=>{const b=custBal(c);return s+(b>0?b:0);},0);
+  const foot=[['TOTAL',...footerQtys,'Rs.'+grandTotal.toFixed(0),totalDues>0?'Rs.'+totalDues.toFixed(0):DASH]];
 
   const doc=new JsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const pageW=297,pageH=210;
 
-  // red header bar
+  // header bar
   doc.setFillColor(15,15,16);
   doc.rect(0,0,pageW,16,'F');
   try{doc.addImage(AMUL_LOGO_B64,'WEBP',14,1,14,14,'','FAST');}catch(e){}
@@ -1490,12 +1507,14 @@ async function downloadAllBillsPDF(){
   // dynamic column widths
   const margin=12;
   const available=pageW-margin*2;
-  const custColW=Math.min(48,available*0.22);
-  const totalColW=24;
-  const prodColW=Math.max(14,Math.min(22,(available-custColW-totalColW)/Math.max(prods.length,1)));
+  const custColW=Math.min(48,available*0.20);
+  const totalColW=22;
+  const duesColW=22;
+  const prodColW=Math.max(13,Math.min(21,(available-custColW-totalColW-duesColW)/Math.max(prods.length,1)));
   const colStyles={0:{cellWidth:custColW,fontStyle:'bold'}};
   prods.forEach((_,i)=>{colStyles[i+1]={cellWidth:prodColW,halign:'center'};});
   colStyles[prods.length+1]={cellWidth:totalColW,halign:'right',fontStyle:'bold',textColor:[232,25,44]};
+  colStyles[prods.length+2]={cellWidth:duesColW,halign:'right',fontStyle:'bold'};
 
   doc.autoTable({
     startY:17,
@@ -1528,15 +1547,29 @@ async function downloadAllBillsPDF(){
     tableLineColor:[180,180,180],
     tableLineWidth:0.4,
     didParseCell(data){
-      // highlight non-empty qty cells
-      if(data.section==='body'&&data.column.index>0&&data.column.index<=prods.length&&data.cell.raw!==''){
+      const duesIdx=prods.length+2;
+      // highlight ordered qty cells green
+      if(data.section==='body'&&data.column.index>0&&data.column.index<=prods.length&&data.cell.raw!==DASH){
         data.cell.styles.fillColor=[232,255,240];
         data.cell.styles.textColor=[10,100,50];
         data.cell.styles.fontStyle='bold';
       }
+      // highlight dues column: red if owed, grey if dash
+      if(data.section==='body'&&data.column.index===duesIdx){
+        if(data.cell.raw!==DASH&&data.cell.raw!==''){
+          data.cell.styles.fillColor=[255,235,235];
+          data.cell.styles.textColor=[180,20,20];
+          data.cell.styles.fontStyle='bold';
+        } else {
+          data.cell.styles.textColor=[180,180,180];
+        }
+      }
+      // style dues footer cell
+      if(data.section==='foot'&&data.column.index===duesIdx){
+        data.cell.styles.textColor=[180,20,20];
+      }
     },
     didDrawCell(data){
-      // draw inner grid lines thicker for readability
       if(data.section==='body'&&data.column.index===0){
         doc.setDrawColor(180,180,180);
         doc.setLineWidth(0.5);
@@ -1544,8 +1577,6 @@ async function downloadAllBillsPDF(){
       }
     }
   });
-
-  // product name sub-row below main table
 
   doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(180,180,180);
   doc.text('Amul Billing · Dispatch Sheet · '+today(),pageW/2,pageH-4,{align:'center'});
