@@ -597,12 +597,12 @@ let activeCustIdx=-1;
 let manifestCleared=false;
 
 // ── SHIFT SYSTEM ─────────────────────────────────────────────────────────────
-// Morning shift: 5:00 — 13:59  (orders collected morning, deliver evening)
-// Evening shift: 14:00 — 4:59  (orders collected evening, deliver next morning)
+// Morning shift: 5:00 — 11:59  (orders collected morning, deliver evening)
+// Evening shift: 12:00 — 4:59  (orders collected evening, deliver next morning)
 let currentShift = detectShift();
 function detectShift(){
   const h = new Date().getHours();
-  return (h >= 5 && h < 14) ? 'morning' : 'evening';
+  return (h >= 5 && h < 12) ? 'morning' : 'evening';
 }
 function shiftLabel(s){ return s==='morning' ? '☀️ Morning Shift' : '🌙 Evening Shift'; }
 function setShift(s){
