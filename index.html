@@ -75,23 +75,22 @@ body{display:flex;flex-direction:column;max-width:560px;margin:0 auto;min-height
 .blue-badge{background:#f2f2f0;color:#0f0f10;border:1px solid #c9c9c5}
 .green-badge{background:var(--green-l);color:var(--green)}
 
-/* CUSTOMER LIST */
-.cust-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+.cust-row{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;min-width:0}
 .cust-row:last-child{border-bottom:none}
 .cust-row:active{background:var(--bg)}
 .cust-avatar{width:36px;height:36px;border-radius:50%;background:#f2f2f0;color:#0f0f10;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
-.cust-info{flex:1}
-.cust-name{font-size:14px;font-weight:700}
-.cust-phone{font-size:11px;color:var(--text3);margin-top:1px}
-.bal-chip{font-size:11px;font-weight:700;border-radius:8px;padding:3px 8px;white-space:nowrap}
+.cust-info{flex:1;min-width:0}
+.cust-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cust-phone{font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bal-chip{font-size:11px;font-weight:700;border-radius:8px;padding:3px 7px;white-space:nowrap;flex-shrink:0}
 .chip-owed{background:var(--red-l);color:var(--red)}
 .chip-clear{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
 .chip-adv{background:var(--green-l);color:var(--green)}
 .caret{font-size:12px;color:var(--text3)}
 /* BOOKED TOGGLE */
-.booked-toggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;flex-shrink:0;font-size:13px;transition:all .15s;color:var(--text3)}
+.booked-toggle{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;flex-shrink:0;font-size:14px;transition:all .15s;color:var(--text3);-webkit-tap-highlight-color:transparent}
 .booked-toggle.booked{background:var(--green-l);border-color:var(--green-b);color:var(--green)}
-.booked-toggle:active{transform:scale(.9)}
+.booked-toggle:active{transform:scale(.88)}
 /* BILL DELETE */
 .bill-del-btn{display:flex;align-items:center;gap:6px;background:var(--red-l);border:1.5px solid var(--red-m);border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:var(--red);cursor:pointer;font-family:inherit;justify-content:center;transition:background .15s}
 .bill-del-btn:active{background:var(--red-m)}
@@ -359,17 +358,16 @@ details[open] .sum-chev{transform:rotate(180deg)}
           <div class="chdr-title">Customer Registry</div>
           <span class="chdr-badge blue-badge" id="custCount">0 shops</span>
         </div>
-        <div style="display:flex;gap:8px;margin:10px 14px 0;align-items:center">
-          <div class="search-bar" style="margin:0;flex:1"><span>🔍</span><input type="text" id="custSearch" placeholder="Search customers…" oninput="filterCustomers(this.value)"></div>
-          <div class="select-wrap" style="margin-bottom:0;width:auto">
-            <select class="styled-select" id="bookedFilter" onchange="filterCustomers(document.getElementById('custSearch').value)" style="padding:8px 30px 8px 10px;font-size:12px;font-weight:700;background:var(--surface)">
-              <option value="all">All</option>
-              <option value="booked">Booked ✓</option>
-              <option value="unbooked">Unbooked</option>
+        <div style="padding:10px 14px 0;display:flex;flex-direction:column;gap:8px">
+          <div class="search-bar" style="margin:0"><span>🔍</span><input type="text" id="custSearch" placeholder="Search customers…" oninput="filterCustomers(this.value)"></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="bookedFilter" onchange="filterCustomers(document.getElementById('custSearch').value)" style="flex:1;appearance:none;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;font-weight:700;color:var(--text);font-family:inherit;outline:none;cursor:pointer;min-width:0">
+              <option value="all">📋 Show all</option>
+              <option value="booked">✓ Booked only</option>
+              <option value="unbooked">○ Unbooked only</option>
             </select>
-            <span class="sel-arrow">▼</span>
+            <button onclick="resetAllBooked()" style="flex-shrink:0;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--text2);font-weight:700;white-space:nowrap;min-height:44px">✕ Reset</button>
           </div>
-          <button onclick="resetAllBooked()" title="Set all to unbooked" style="flex-shrink:0;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:7px 10px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--text2);font-weight:700" onmouseenter="this.style.borderColor='var(--text2)'" onmouseleave="this.style.borderColor='var(--border)'">✕ Reset</button>
         </div>
         <div id="custList">
           <div class="empty"><span class="empty-icon">🏪</span><div class="empty-title">No customers yet</div><div class="empty-sub">Add your shops below to get started.</div></div>
@@ -731,6 +729,9 @@ function renderCustomers(){
     </div>`;
   }).join('');
   populateSelects();
+  // Re-apply any active filter/search after re-render
+  const q=(document.getElementById('custSearch')||{value:''}).value;
+  if(q||((document.getElementById('bookedFilter')||{value:'all'}).value!=='all')) filterCustomers(q);
 }
 
 function toggleBooked(i){
