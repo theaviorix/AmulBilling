@@ -1439,20 +1439,14 @@ async function downloadAllBillsPDF(){
   try{JsPDF=await loadJsPDF();}
   catch(e){showToast('Could not load PDF library. Check internet.');return;}
 
-  // ── Products: follow the master products[] list order, include only those
-  //    that appear in at least one bill; blanks show as dash not empty
-  const orderedInBills=new Set();
-  bills.forEach(o=>o.items.forEach(item=>orderedInBills.add(item.prod.key)));
-  // Use products[] order as master; fall back to bill-insertion order for any
-  // product key not found in products[] (e.g. deleted products)
-  const masterKeys=products.map(p=>p.key);
-  const extraKeys=[...orderedInBills].filter(k=>!masterKeys.includes(k));
-  const prodKeys=[...masterKeys.filter(k=>orderedInBills.has(k)),...extraKeys];
-  // Build prod objects: prefer master products[] entry, else use bill item snapshot
+  // ── Products: ALL products in master list order (always show every column).
+  //    Append any deleted products still referenced in bills at the end.
   const prodObjMap=new Map();
   products.forEach(p=>prodObjMap.set(p.key,p));
   bills.forEach(o=>o.items.forEach(item=>{if(!prodObjMap.has(item.prod.key))prodObjMap.set(item.prod.key,item.prod);}));
-  const prods=prodKeys.map(k=>prodObjMap.get(k));
+  const masterKeys=products.map(p=>p.key);
+  const extraKeys=[...prodObjMap.keys()].filter(k=>!masterKeys.includes(k));
+  const prods=[...masterKeys,...extraKeys].map(k=>prodObjMap.get(k));
 
   // ── Build table rows
   const DASH='—'; // em dash for empty cells
