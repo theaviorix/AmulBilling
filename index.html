@@ -246,6 +246,17 @@ details[open] .sum-chev{transform:rotate(180deg)}
 .kb-share-stmt-btn:active{background:#c9c9c5}
 .bill-pdf-btn{display:flex;align-items:center;gap:6px;background:#f2f2f0;border:1.5px solid #c9c9c5;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:#0f0f10;cursor:pointer;font-family:inherit;justify-content:center;transition:background .15s;width:100%}
 .bill-pdf-btn:active{background:#c9c9c5}
+.shift-banner{display:flex;align-items:center;gap:8px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:10px 14px;margin-bottom:12px}
+.shift-banner-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+.shift-badge{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid transparent;color:var(--text3);background:none;font-family:inherit;transition:all .15s}
+.shift-badge.shift-active.morning{background:#fff8e6;color:#b07800;border-color:#f0c040}
+.shift-badge.shift-active.evening{background:#eef0ff;color:#3546c8;border-color:#8898ff}
+.missing-alert{background:#fff5f5;border:1.5px solid #ffb3b3;border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.missing-alert-hdr{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#c0392b;margin-bottom:8px}
+.missing-alert-hdr span{font-size:15px}
+.missing-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #ffe0e0;font-size:13px;color:var(--text)}
+.missing-row:last-child{border-bottom:none}
+.missing-dot{width:8px;height:8px;border-radius:50%;background:#e74c3c;flex-shrink:0}
 .dl-all-btn{width:100%;background:#0f0f10;border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;letter-spacing:.01em;box-shadow:0 2px 8px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;gap:6px}
 .dl-all-btn:active{opacity:.8}
 .inv-btn-row{display:flex;gap:8px;margin-top:0}
@@ -428,6 +439,13 @@ details[open] .sum-chev{transform:rotate(180deg)}
 
     <!-- BILLS TAB -->
     <div class="mtab" id="mtab-bills">
+      <!-- Shift selector — always visible at top of bills tab -->
+      <div class="shift-banner">
+        <span class="shift-banner-label">Shift</span>
+        <button class="shift-badge morning shift-active" id="shiftBadgeMorning" onclick="setShift('morning')">☀️ Morning</button>
+        <button class="shift-badge evening" id="shiftBadgeEvening" onclick="setShift('evening')">🌙 Evening</button>
+        <span style="margin-left:auto;font-size:11px;color:var(--text3)" id="shiftAutoLabel">Auto-detected</span>
+      </div>
       <div id="billsOutput">
         <div class="empty"><span class="empty-icon">📄</span><div class="empty-title">No bills yet</div><div class="empty-sub">Enter orders then tap Confirm order.</div></div>
       </div>
@@ -577,6 +595,22 @@ let bills=[];
 let builderItems=[];
 let activeCustIdx=-1;
 let manifestCleared=false;
+
+// ── SHIFT SYSTEM ─────────────────────────────────────────────────────────────
+// Morning shift: 5:00 — 13:59  (orders collected morning, deliver evening)
+// Evening shift: 14:00 — 4:59  (orders collected evening, deliver next morning)
+let currentShift = detectShift();
+function detectShift(){
+  const h = new Date().getHours();
+  return (h >= 5 && h < 14) ? 'morning' : 'evening';
+}
+function shiftLabel(s){ return s==='morning' ? '☀️ Morning Shift' : '🌙 Evening Shift'; }
+function setShift(s){
+  currentShift=s;
+  document.getElementById('shiftBadgeMorning').classList.toggle('shift-active', s==='morning');
+  document.getElementById('shiftBadgeEvening').classList.toggle('shift-active', s==='evening');
+  renderBills();
+}
 
 // ── FIREBASE BRIDGE ─────────────────────────────────────────────────────────
 // Shared state object written by the Firebase module, read by _applyAppState
@@ -1065,8 +1099,12 @@ async function clearBills(){
 }
 function confirmOrder(){
   if(!orders.length){showToast('No orders to confirm.');return;}
-  // push a deep copy of current orders into confirmed bills, then reset
-  orders.forEach(o=>bills.push(JSON.parse(JSON.stringify(o))));
+  // push a deep copy of current orders into confirmed bills, tagged with shift
+  orders.forEach(o=>{
+    const b=JSON.parse(JSON.stringify(o));
+    b.shift=currentShift;
+    bills.push(b);
+  });
   orders=[];
   manifestCleared=false;
   renderActiveOrders();
@@ -1093,12 +1131,40 @@ function postBillToLedger(oi){
 
 function renderBills(){
   const out=document.getElementById('billsOutput');
-  if(!bills.length){
-    out.innerHTML=`<div class="empty"><span class="empty-icon">📄</span><div class="empty-title">No bills yet</div><div class="empty-sub">Add orders then tap Confirm orders.</div></div>`;
+
+  // ── Sync shift badge UI ───────────────────────────────────────────────────
+  document.getElementById('shiftBadgeMorning').classList.toggle('shift-active', currentShift==='morning');
+  document.getElementById('shiftBadgeEvening').classList.toggle('shift-active', currentShift==='evening');
+  const detected=detectShift();
+  document.getElementById('shiftAutoLabel').textContent=
+    currentShift===detected ? 'Auto-detected' : 'Manually overridden';
+
+  // ── Filter bills to current shift ─────────────────────────────────────────
+  // Bills without a shift tag (legacy) are shown in both shifts
+  const shiftBills=bills.filter(b=>!b.shift||b.shift===currentShift);
+
+  // ── Missing orders: customers with no bill in this shift ──────────────────
+  const billedNames=new Set(shiftBills.map(b=>b.custName));
+  const missingCustomers=customers.filter(c=>!billedNames.has(c.name));
+  let missingHtml='';
+  if(missingCustomers.length){
+    const rows=missingCustomers.map(c=>{
+      const lastBill=[...bills].reverse().find(b=>b.custName===c.name);
+      const lastLabel=lastBill?'Last bill: '+(lastBill.date||'—').split(',')[0]:'No bills yet';
+      return `<div class="missing-row"><div class="missing-dot"></div><span style="font-weight:600">${c.name}</span><span style="margin-left:auto;font-size:11px;color:var(--text3)">${lastLabel}</span></div>`;
+    }).join('');
+    missingHtml=`<div class="missing-alert">
+      <div class="missing-alert-hdr"><span>⚠️</span>${missingCustomers.length} customer${missingCustomers.length!==1?'s':''} haven't ordered this shift</div>
+      ${rows}
+    </div>`;
+  }
+
+  if(!shiftBills.length){
+    out.innerHTML=missingHtml+`<div class="empty"><span class="empty-icon">📄</span><div class="empty-title">No ${shiftLabel(currentShift)} bills yet</div><div class="empty-sub">Switch shifts or add orders then confirm.</div></div>`;
     return;
   }
   const manifest={};const flags=[];let totalRev=0,totalUnits=0;
-  bills.forEach(o=>{
+  shiftBills.forEach(o=>{
     o.items.forEach(item=>{
       const p=item.prod;const price=parseFloat(p.price)||0;
       if(!price)flags.push('Price not set for <b>'+p.name+' '+p.unit+'</b>');
@@ -1110,7 +1176,7 @@ function renderBills(){
 
   const stripHtml=`<div class="stat-strip">
     <div class="stat-pills-row">
-      <div class="stat-pill"><div class="stat-val">${bills.length}</div><div class="stat-lbl">Shops</div></div>
+      <div class="stat-pill"><div class="stat-val">${shiftBills.length}</div><div class="stat-lbl">Shops</div></div>
       <div class="stat-pill"><div class="stat-val">${fmtQty(totalUnits)}</div><div class="stat-lbl">Units</div></div>
       <div class="stat-pill"><div class="stat-val" style="font-size:${totalRev>=10000?'13px':'18px'}">₹${Math.round(totalRev)}</div><div class="stat-lbl">Revenue</div></div>
     </div>
@@ -1135,8 +1201,8 @@ function renderBills(){
 
   // Group bills by date (date part only, strip time)
   const dateKey=d=>(d||'Unknown date').split(',')[0].trim();
-  // Sort bills latest first (use original index to preserve postBillToLedger(oi) correctness)
-  const indexed=bills.map((o,oi)=>({o,oi}));
+  // Sort bills latest first — use original index in bills[] for postBillToLedger(oi)
+  const indexed=bills.map((o,oi)=>({o,oi})).filter(({o})=>!o.shift||o.shift===currentShift);
   // Parse "DD Mon YYYY" for sorting
   const parseDate=s=>{
     const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
@@ -1192,7 +1258,7 @@ function renderBills(){
   });
   invoicesHtml+='</div>';
 
-  out.innerHTML=stripHtml+(manifestCleared?'':manifestHtml)+searchHtml+flagsHtml+invoicesHtml;
+  out.innerHTML=missingHtml+stripHtml+(manifestCleared?'':manifestHtml)+searchHtml+flagsHtml+invoicesHtml;
 }
 
 function filterBills(q){
@@ -1620,6 +1686,9 @@ window.switchAuthTab=function(t){
 // Do NOT loadState() here — Firebase auth listener handles data loading per user
 // Just render empty state while waiting for auth
 renderCustomers();renderPrices();populateSelects();renderActiveOrders();
+// Init shift banner to auto-detected shift
+document.getElementById('shiftBadgeMorning').classList.toggle('shift-active', currentShift==='morning');
+document.getElementById('shiftBadgeEvening').classList.toggle('shift-active', currentShift==='evening');
 
 // ── EXPOSE FUNCTIONS TO GLOBAL SCOPE (required for inline onclick handlers) ──
 window.mgo=mgo;
@@ -1658,6 +1727,7 @@ window.openPriceModal=openPriceModal;
 window.postBillToLedger=postBillToLedger;
 window.removeProduct=removeProduct;
 window.renderActiveOrders=renderActiveOrders;
+window.setShift=setShift;
 window.renderLineItems=renderLineItems;
 window.runConfirmOk=runConfirmOk;
 window.saveGave=saveGave;
