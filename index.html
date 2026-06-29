@@ -1457,15 +1457,31 @@ async function downloadAllBillsPDF(){
   // ── Build table rows
   const DASH='—'; // em dash for empty cells
   const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total','Dues']];
+  // Track dues per row (numeric) for footer sum
+  const rowDues=[];
+
   const body=bills.map(o=>{
     const qtyMap={};
     o.items.forEach(item=>qtyMap[item.prod.key]=item.qty);
     const grand=calcGrand(o);
 
-    // Khatabook due for this customer
+    // Khatabook due = customer's ledger balance BEFORE this bill.
+    // If the bill was already posted to ledger, custBal includes it —
+    // so subtract it back to show the pre-delivery outstanding balance.
     const cust=customers.find(c=>c.name===o.custName);
-    const due=cust?custBal(cust):0;
-    const dueStr=due>0?'Rs.'+due.toFixed(0):(due<0?'Adv.':DASH);
+    const fullBal=cust?custBal(cust):0;
+    const due=o.posted?fullBal-grand:fullBal;
+
+    rowDues.push(due);
+
+    let dueStr;
+    if(due>0){
+      dueStr='Rs.'+due.toFixed(0);          // owes money  → red
+    } else if(due<0){
+      dueStr='Adv. Rs.'+Math.abs(due).toFixed(0);  // advance paid → green
+    } else {
+      dueStr=DASH;                           // settled → grey dash
+    }
 
     return [
       o.custName,
@@ -1478,7 +1494,7 @@ async function downloadAllBillsPDF(){
     ];
   });
 
-  // ── Totals footer
+  // ── Totals footer — sum only positive dues (what customers owe)
   const footerQtys=prods.map(p=>{
     const t=bills.reduce((s,o)=>{
       const item=o.items.find(i=>i.prod.key===p.key);
@@ -1487,7 +1503,7 @@ async function downloadAllBillsPDF(){
     return t>0?fmtQty(t):DASH;
   });
   const grandTotal=bills.reduce((s,o)=>s+calcGrand(o),0);
-  const totalDues=customers.reduce((s,c)=>{const b=custBal(c);return s+(b>0?b:0);},0);
+  const totalDues=rowDues.reduce((s,d)=>s+(d>0?d:0),0);
   const foot=[['TOTAL',...footerQtys,'Rs.'+grandTotal.toFixed(0),totalDues>0?'Rs.'+totalDues.toFixed(0):DASH]];
 
   const doc=new JsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -1554,13 +1570,21 @@ async function downloadAllBillsPDF(){
         data.cell.styles.textColor=[10,100,50];
         data.cell.styles.fontStyle='bold';
       }
-      // highlight dues column: red if owed, grey if dash
+      // highlight dues column: red=owed, green=advance, grey=settled
       if(data.section==='body'&&data.column.index===duesIdx){
-        if(data.cell.raw!==DASH&&data.cell.raw!==''){
+        const raw=data.cell.raw||'';
+        if(raw.startsWith('Rs.')){
+          // customer owes money
           data.cell.styles.fillColor=[255,235,235];
           data.cell.styles.textColor=[180,20,20];
           data.cell.styles.fontStyle='bold';
+        } else if(raw.startsWith('Adv.')){
+          // customer has advance credit
+          data.cell.styles.fillColor=[232,255,240];
+          data.cell.styles.textColor=[10,110,50];
+          data.cell.styles.fontStyle='bold';
         } else {
+          // dash / settled
           data.cell.styles.textColor=[180,180,180];
         }
       }
