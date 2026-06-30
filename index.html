@@ -431,17 +431,17 @@ details[open] .sum-chev{transform:rotate(180deg)}
             <div class="combo-list" id="custComboList"></div>
           </div>
           <div class="field-label">Add product</div>
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            <div class="combo-wrap" id="prodComboWrap" style="flex:1;margin-bottom:0">
-              <div class="combo-input-row">
-                <input class="combo-input" id="prodSearch" placeholder="Search or select product…" autocomplete="off"
-                  oninput="filterProdDropdown(this.value)" onfocus="openProdDropdown()">
-                <button type="button" class="combo-arrow-btn" onclick="toggleProdDropdown()">▼</button>
-              </div>
-              <div class="combo-list" id="prodComboList"></div>
+          <div class="combo-wrap" id="prodComboWrap" style="margin-bottom:8px">
+            <div class="combo-input-row">
+              <input class="combo-input" id="prodSearch" placeholder="Search or select product…" autocomplete="off"
+                oninput="filterProdDropdown(this.value)" onfocus="openProdDropdown()">
+              <button type="button" class="combo-arrow-btn" onclick="toggleProdDropdown()">▼</button>
             </div>
-            <input class="p-input" type="number" id="selProdQty" value="1" min="0.5" step="0.5" inputmode="decimal" style="width:58px;margin-bottom:0;padding:10px 6px;text-align:center" aria-label="Quantity">
-            <button class="btn-red" style="width:auto;padding:10px 14px;margin-top:0" onclick="addLineItem()">➕</button>
+            <div class="combo-list" id="prodComboList"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input class="p-input" type="number" id="selProdQty" value="1" min="0.5" step="0.5" inputmode="decimal" style="flex:1;min-width:0;margin-bottom:0;padding:10px 6px;text-align:center" aria-label="Quantity">
+            <button class="btn-red" style="flex-shrink:0;width:auto;padding:10px 18px;margin-top:0;white-space:nowrap" onclick="addLineItem()">➕ Add</button>
           </div>
           <div id="lineItems" style="display:none;margin-bottom:10px"></div>
           <button class="btn-red" onclick="commitOrder()">Add to orders</button>
