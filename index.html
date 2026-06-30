@@ -190,6 +190,22 @@ details[open] .sum-chev{transform:rotate(180deg)}
 .styled-select{width:100%;appearance:none;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 36px 10px 12px;font-size:14px;font-weight:600;color:var(--text);font-family:inherit;outline:none;cursor:pointer}
 .styled-select:focus{border-color:#0f0f10;background:#fff}
 .sel-arrow{position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);font-size:11px}
+
+/* SEARCHABLE COMBOBOX (customer / product pickers) */
+.combo-wrap{position:relative}
+.combo-input-row{display:flex;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);overflow:hidden;transition:border-color .15s}
+.combo-wrap.open .combo-input-row{border-color:#0f0f10;border-radius:10px 10px 0 0;background:#fff}
+.combo-input{flex:1;min-width:0;border:none;background:transparent;padding:10px 10px 10px 12px;font-size:14px;font-weight:600;color:var(--text);font-family:inherit;outline:none}
+.combo-input::placeholder{color:var(--text3);font-weight:500}
+.combo-arrow-btn{flex-shrink:0;width:38px;border:none;background:transparent;color:var(--text3);font-size:10px;cursor:pointer;border-left:1px solid var(--border)}
+.combo-wrap.open .combo-arrow-btn{transform:rotate(180deg)}
+.combo-list{display:none;position:absolute;left:0;right:0;top:100%;z-index:40;background:#fff;border:1.5px solid #0f0f10;border-top:none;border-radius:0 0 10px 10px;max-height:220px;overflow-y:auto;box-shadow:0 8px 20px rgba(0,0,0,.12)}
+.combo-wrap.open .combo-list{display:block}
+.combo-opt{padding:10px 12px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--border)}
+.combo-opt:last-child{border-bottom:none}
+.combo-opt:active,.combo-opt.combo-opt-hl{background:var(--bg)}
+.combo-opt-sub{font-size:11px;color:var(--text3);font-weight:500;margin-top:1px}
+.combo-empty{padding:14px 12px;font-size:13px;color:var(--text3);text-align:center}
 .qty-ctrl{display:flex;align-items:center;gap:6px}
 .qty-btn{width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;font-weight:700;transition:all .1s;font-family:inherit}
 .qty-btn:active{background:#0f0f10;border-color:#0f0f10;color:#fff}
@@ -405,21 +421,23 @@ details[open] .sum-chev{transform:rotate(180deg)}
         </div>
         <div style="padding:12px 14px">
           <div class="field-label">Customer</div>
-          <div style="position:relative;margin-bottom:10px">
-            <input class="add-input" id="custOrderSearch" placeholder="🔍 Search customer…" oninput="filterCustDropdown(this.value)" onfocus="openCustDropdown()" style="width:100%;border-radius:10px 10px 0 0;border-bottom:none;display:none">
-            <div class="select-wrap" id="custSelectWrap">
-              <select class="styled-select" id="selCust" size="1" onchange="onCustSelect()"><option value="">— Select customer —</option></select>
-              <span class="sel-arrow">▼</span>
+          <div class="combo-wrap" id="custComboWrap" style="margin-bottom:10px">
+            <div class="combo-input-row">
+              <input class="combo-input" id="custOrderSearch" placeholder="Search or select customer…" autocomplete="off"
+                oninput="filterCustDropdown(this.value)" onfocus="openCustDropdown()">
+              <button type="button" class="combo-arrow-btn" onclick="toggleCustDropdown()">▼</button>
             </div>
+            <div class="combo-list" id="custComboList"></div>
           </div>
           <div class="field-label">Add product</div>
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            <div style="flex:1;position:relative">
-              <input class="add-input" id="prodSearch" placeholder="🔍 Search product…" oninput="filterProdDropdown(this.value)" onfocus="openProdDropdown()" style="width:100%;border-radius:10px 10px 0 0;border-bottom:none;display:none">
-              <div class="select-wrap" id="prodSelectWrap" style="margin-bottom:0">
-                <select class="styled-select" id="selProd" onchange="onProdSelect()"><option value="">— Select product —</option></select>
-                <span class="sel-arrow">▼</span>
+            <div class="combo-wrap" id="prodComboWrap" style="flex:1;margin-bottom:0">
+              <div class="combo-input-row">
+                <input class="combo-input" id="prodSearch" placeholder="Search or select product…" autocomplete="off"
+                  oninput="filterProdDropdown(this.value)" onfocus="openProdDropdown()">
+                <button type="button" class="combo-arrow-btn" onclick="toggleProdDropdown()">▼</button>
               </div>
+              <div class="combo-list" id="prodComboList"></div>
             </div>
             <input class="p-input" type="number" id="selProdQty" value="1" min="0.5" step="0.5" inputmode="decimal" style="width:58px;margin-bottom:0;padding:10px 6px;text-align:center" aria-label="Quantity">
             <button class="btn-red" style="width:auto;padding:10px 14px;margin-top:0" onclick="addLineItem()">➕</button>
@@ -934,91 +952,84 @@ function confirmAddProduct(){
 }
 
 // ── SELECTS ───────────────────────────────────────────────────────────────────
+let selectedCustName='';
+let selectedProdKey='';
+
 function populateSelects(){
-  const sc=document.getElementById('selCust');
-  if(sc){
-    const cv=sc.value;
-    sc.innerHTML='<option value="">— Select customer —</option>'+customers.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
-    if(cv)sc.value=cv;
-  }
-  const sp=document.getElementById('selProd');
-  if(sp){
-    const pv=sp.value;
-    sp.innerHTML='<option value="">— Select product —</option>'+products.map(p=>`<option value="${p.key}">${p.name} (${p.unit})</option>`).join('');
-    if(pv)sp.value=pv;
-  }
+  // Refresh dropdown lists if currently open (e.g. after adding a new customer/product)
+  const ccw=document.getElementById('custComboWrap');
+  if(ccw&&ccw.classList.contains('open')) filterCustDropdown(document.getElementById('custOrderSearch').value);
+  const pcw=document.getElementById('prodComboWrap');
+  if(pcw&&pcw.classList.contains('open')) filterProdDropdown(document.getElementById('prodSearch').value);
+}
+
+function custOptionHtml(list){
+  if(!list.length) return '<div class="combo-empty">No customers found</div>';
+  return list.map(c=>`<div class="combo-opt" onmousedown="event.preventDefault()" onclick="selectCustomer('${c.name.replace(/'/g,"\\'")}')">
+      <div>${c.name}</div>${c.phone?`<div class="combo-opt-sub">${c.phone}</div>`:''}
+    </div>`).join('');
+}
+function prodOptionHtml(list){
+  if(!list.length) return '<div class="combo-empty">No products found</div>';
+  return list.map(p=>`<div class="combo-opt" onmousedown="event.preventDefault()" onclick="selectProduct('${p.key}')">
+      <div>${p.name}</div><div class="combo-opt-sub">${p.unit}${p.price?' · '+fmt(p.price):''}</div>
+    </div>`).join('');
 }
 
 function filterCustDropdown(q){
-  const sc=document.getElementById('selCust');
-  if(!sc)return;
   const lq=q.toLowerCase();
-  sc.innerHTML='<option value="">— Select customer —</option>'+customers.filter(c=>c.name.toLowerCase().includes(lq)||(c.phone||'').includes(lq)).map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
-  sc.size=Math.min(customers.filter(c=>c.name.toLowerCase().includes(lq)||(c.phone||'').includes(lq)).length+1,6);
-  sc.style.borderRadius='0 0 10px 10px';
-  sc.style.borderTop='none';
-  document.getElementById('custSelectWrap').style.display='block';
+  const list=customers.filter(c=>c.name.toLowerCase().includes(lq)||(c.phone||'').includes(lq));
+  document.getElementById('custComboList').innerHTML=custOptionHtml(list);
+  document.getElementById('custComboWrap').classList.add('open');
+  if(!q) selectedCustName='';
 }
-
 function openCustDropdown(){
-  const sw=document.getElementById('custSelectWrap');
-  const si=document.getElementById('custOrderSearch');
-  si.style.display='block';
-  const sc=document.getElementById('selCust');
-  sc.size=Math.min(customers.length+1,6);
-  sc.style.borderRadius='0 0 10px 10px';
-  sc.style.borderTop='none';
-  sw.style.display='block';
+  document.getElementById('custComboList').innerHTML=custOptionHtml(customers);
+  document.getElementById('custComboWrap').classList.add('open');
 }
-
-function onCustSelect(){
-  const sc=document.getElementById('selCust');
-  const si=document.getElementById('custOrderSearch');
-  si.style.display='none';
-  sc.size=1;
-  sc.style.borderRadius='10px';
-  sc.style.borderTop='';
-  si.value='';
-  populateSelects();
-  sc.value=sc.value; // keep selection
+function toggleCustDropdown(){
+  const w=document.getElementById('custComboWrap');
+  if(w.classList.contains('open')){closeCustDropdown();}
+  else{document.getElementById('custOrderSearch').focus();openCustDropdown();}
+}
+function closeCustDropdown(){document.getElementById('custComboWrap').classList.remove('open');}
+function selectCustomer(name){
+  selectedCustName=name;
+  document.getElementById('custOrderSearch').value=name;
+  closeCustDropdown();
 }
 
 function filterProdDropdown(q){
-  const sp=document.getElementById('selProd');
-  if(!sp)return;
   const lq=q.toLowerCase();
-  const filtered=products.filter(p=>p.name.toLowerCase().includes(lq)||(p.unit||'').toLowerCase().includes(lq));
-  sp.innerHTML='<option value="">— Select product —</option>'+filtered.map(p=>`<option value="${p.key}">${p.name} (${p.unit})</option>`).join('');
-  sp.size=Math.min(filtered.length+1,6);
-  sp.style.borderRadius='0 0 10px 10px';
-  sp.style.borderTop='none';
-  document.getElementById('prodSelectWrap').style.display='block';
+  const list=products.filter(p=>p.name.toLowerCase().includes(lq)||(p.unit||'').toLowerCase().includes(lq));
+  document.getElementById('prodComboList').innerHTML=prodOptionHtml(list);
+  document.getElementById('prodComboWrap').classList.add('open');
+  if(!q) selectedProdKey='';
 }
-
 function openProdDropdown(){
-  const sw=document.getElementById('prodSelectWrap');
-  const si=document.getElementById('prodSearch');
-  si.style.display='block';
-  const sp=document.getElementById('selProd');
-  sp.size=Math.min(products.length+1,6);
-  sp.style.borderRadius='0 0 10px 10px';
-  sp.style.borderTop='none';
-  sw.style.display='block';
+  document.getElementById('prodComboList').innerHTML=prodOptionHtml(products);
+  document.getElementById('prodComboWrap').classList.add('open');
+}
+function toggleProdDropdown(){
+  const w=document.getElementById('prodComboWrap');
+  if(w.classList.contains('open')){closeProdDropdown();}
+  else{document.getElementById('prodSearch').focus();openProdDropdown();}
+}
+function closeProdDropdown(){document.getElementById('prodComboWrap').classList.remove('open');}
+function selectProduct(key){
+  selectedProdKey=key;
+  const p=products.find(x=>x.key===key);
+  document.getElementById('prodSearch').value=p?p.name:'';
+  closeProdDropdown();
 }
 
-function onProdSelect(){
-  const sp=document.getElementById('selProd');
-  const si=document.getElementById('prodSearch');
-  si.style.display='none';
-  sp.size=1;
-  sp.style.borderRadius='10px';
-  sp.style.borderTop='';
-  si.value='';
-  // Rebuild full list but keep selection
-  const chosen=sp.value;
-  sp.innerHTML='<option value="">— Select product —</option>'+products.map(p=>`<option value="${p.key}">${p.name} (${p.unit})</option>`).join('');
-  sp.value=chosen;
-}
+// Close dropdowns when tapping outside of them
+document.addEventListener('click',function(e){
+  const ccw=document.getElementById('custComboWrap');
+  const pcw=document.getElementById('prodComboWrap');
+  if(ccw&&!ccw.contains(e.target))closeCustDropdown();
+  if(pcw&&!pcw.contains(e.target))closeProdDropdown();
+});
 
 // ── ORDER BUILDER ─────────────────────────────────────────────────────────────
 function fmtQty(n){
@@ -1029,14 +1040,14 @@ function fmtQty(n){
 }
 
 function addLineItem(){
-  const pk=document.getElementById('selProd').value;if(!pk)return;
+  const pk=selectedProdKey;if(!pk){showToast('Select a product first.');return;}
   const prod=products.find(p=>p.key===pk);if(!prod)return;
   const qty=Math.max(0.5,parseFloat(document.getElementById('selProdQty').value)||1);
   const ex=builderItems.find(i=>i.prod.key===pk);
   if(ex){ex.qty=Math.round((ex.qty+qty)*2)/2;}else{builderItems.push({prod,qty});}
   renderLineItems();
-  onProdSelect();
-  document.getElementById('selProd').value='';
+  selectedProdKey='';
+  document.getElementById('prodSearch').value='';
   document.getElementById('selProdQty').value=1;
 }
 function renderLineItems(){
@@ -1067,15 +1078,15 @@ function renderLineItems(){
 }
 function chgQty(i,d){builderItems[i].qty=Math.max(0.5,Math.round((builderItems[i].qty+d)*2)/2);renderLineItems();}
 function commitOrder(){
-  const cn=document.getElementById('selCust').value;
+  const cn=selectedCustName;
   if(!cn){showToast('Select a customer.');return;}
   if(!builderItems.length){showToast('Add at least one product.');return;}
   let o=orders.find(x=>x.custName===cn);
   if(o){builderItems.forEach(bi=>{const ex=o.items.find(i=>i.prod.key===bi.prod.key);if(ex)ex.qty+=bi.qty;else o.items.push({...bi});});}
   else orders.push({custName:cn,items:builderItems.map(i=>({...i})),posted:false,date:today()});
   builderItems=[];renderLineItems();renderActiveOrders();saveState();
-  onCustSelect();document.getElementById('selCust').value='';
-  onProdSelect();document.getElementById('selProd').value='';document.getElementById('selProdQty').value=1;
+  selectedCustName='';document.getElementById('custOrderSearch').value='';
+  selectedProdKey='';document.getElementById('prodSearch').value='';document.getElementById('selProdQty').value=1;
 }
 function renderActiveOrders(){
   const card=document.getElementById('activeOrdersCard');
@@ -1660,10 +1671,12 @@ window.resetAllBooked=resetAllBooked;
 window.filterCustomers=filterCustomers;
 window.filterCustDropdown=filterCustDropdown;
 window.openCustDropdown=openCustDropdown;
-window.onCustSelect=onCustSelect;
+window.toggleCustDropdown=toggleCustDropdown;
+window.selectCustomer=selectCustomer;
 window.filterProdDropdown=filterProdDropdown;
 window.openProdDropdown=openProdDropdown;
-window.onProdSelect=onProdSelect;
+window.toggleProdDropdown=toggleProdDropdown;
+window.selectProduct=selectProduct;
 window.closeEditCustModal=closeEditCustModal;
 window.saveEditCust=saveEditCust;
 window.quickAddCust=quickAddCust;
