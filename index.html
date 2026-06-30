@@ -67,6 +67,7 @@ body{display:flex;flex-direction:column;max-width:560px;margin:0 auto;min-height
 
 /* ── CARDS ── */
 .card{background:var(--surface);border-radius:var(--r);border:1px solid var(--border);overflow:hidden;margin-bottom:12px}
+.card:has(.combo-wrap.open){overflow:visible}
 .card-hdr{padding:11px 14px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
 .chdr-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
 .chdr-title{font-size:13px;font-weight:700;flex:1}
@@ -976,23 +977,35 @@ function prodOptionHtml(list){
     </div>`).join('');
 }
 
+// Fallback for browsers without CSS :has() support — directly toggles
+// overflow:visible on the ancestor .card so the dropdown isn't clipped.
+function setComboCardOverflow(wrapEl,open){
+  const card=wrapEl.closest('.card');
+  if(card) card.style.overflow=open?'visible':'';
+}
+
 function filterCustDropdown(q){
   const lq=q.toLowerCase();
   const list=customers.filter(c=>c.name.toLowerCase().includes(lq)||(c.phone||'').includes(lq));
   document.getElementById('custComboList').innerHTML=custOptionHtml(list);
-  document.getElementById('custComboWrap').classList.add('open');
+  const w=document.getElementById('custComboWrap');
+  w.classList.add('open');setComboCardOverflow(w,true);
   if(!q) selectedCustName='';
 }
 function openCustDropdown(){
   document.getElementById('custComboList').innerHTML=custOptionHtml(customers);
-  document.getElementById('custComboWrap').classList.add('open');
+  const w=document.getElementById('custComboWrap');
+  w.classList.add('open');setComboCardOverflow(w,true);
 }
 function toggleCustDropdown(){
   const w=document.getElementById('custComboWrap');
   if(w.classList.contains('open')){closeCustDropdown();}
   else{document.getElementById('custOrderSearch').focus();openCustDropdown();}
 }
-function closeCustDropdown(){document.getElementById('custComboWrap').classList.remove('open');}
+function closeCustDropdown(){
+  const w=document.getElementById('custComboWrap');
+  w.classList.remove('open');setComboCardOverflow(w,false);
+}
 function selectCustomer(name){
   selectedCustName=name;
   document.getElementById('custOrderSearch').value=name;
@@ -1003,19 +1016,24 @@ function filterProdDropdown(q){
   const lq=q.toLowerCase();
   const list=products.filter(p=>p.name.toLowerCase().includes(lq)||(p.unit||'').toLowerCase().includes(lq));
   document.getElementById('prodComboList').innerHTML=prodOptionHtml(list);
-  document.getElementById('prodComboWrap').classList.add('open');
+  const w=document.getElementById('prodComboWrap');
+  w.classList.add('open');setComboCardOverflow(w,true);
   if(!q) selectedProdKey='';
 }
 function openProdDropdown(){
   document.getElementById('prodComboList').innerHTML=prodOptionHtml(products);
-  document.getElementById('prodComboWrap').classList.add('open');
+  const w=document.getElementById('prodComboWrap');
+  w.classList.add('open');setComboCardOverflow(w,true);
 }
 function toggleProdDropdown(){
   const w=document.getElementById('prodComboWrap');
   if(w.classList.contains('open')){closeProdDropdown();}
   else{document.getElementById('prodSearch').focus();openProdDropdown();}
 }
-function closeProdDropdown(){document.getElementById('prodComboWrap').classList.remove('open');}
+function closeProdDropdown(){
+  const w=document.getElementById('prodComboWrap');
+  w.classList.remove('open');setComboCardOverflow(w,false);
+}
 function selectProduct(key){
   selectedProdKey=key;
   const p=products.find(x=>x.key===key);
