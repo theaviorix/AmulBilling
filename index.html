@@ -92,6 +92,18 @@ body{display:flex;flex-direction:column;max-width:560px;margin:0 auto;min-height
 .booked-toggle{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;flex-shrink:0;font-size:14px;transition:all .15s;color:var(--text3);-webkit-tap-highlight-color:transparent}
 .booked-toggle.booked{background:var(--green-l);border-color:var(--green-b);color:var(--green)}
 .booked-toggle:active{transform:scale(.88)}
+/* PRODUCT QTY GRID */
+.pqg-row{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);gap:10px}
+.pqg-row:last-child{border-bottom:none}
+.pqg-info{flex:1;min-width:0}
+.pqg-name{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pqg-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.pqg-stepper{display:flex;align-items:center;flex-shrink:0;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg)}
+.pqg-stepper.active{border-color:var(--red)}
+.pqg-btn{width:36px;height:36px;border:none;background:transparent;font-size:20px;font-weight:700;cursor:pointer;color:var(--text2);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;line-height:1}
+.pqg-btn:active{background:var(--border)}
+.pqg-qty{width:38px;border:none;background:transparent;font-size:14px;font-weight:700;text-align:center;font-family:inherit;color:var(--text);outline:none;padding:0}
+.pqg-qty.nonzero{color:var(--red)}
 /* BILL DELETE */
 .bill-del-btn{display:flex;align-items:center;gap:6px;background:var(--red-l);border:1.5px solid var(--red-m);border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:var(--red);cursor:pointer;font-family:inherit;justify-content:center;transition:background .15s}
 .bill-del-btn:active{background:var(--red-m)}
@@ -439,7 +451,7 @@ details[open] .sum-chev{transform:rotate(180deg)}
         </div>
         <div style="padding:12px 14px">
           <div class="field-label">Customer</div>
-          <div class="combo-wrap" id="custComboWrap" style="margin-bottom:10px">
+          <div class="combo-wrap" id="custComboWrap" style="margin-bottom:12px">
             <div class="combo-input-row">
               <input class="combo-input" id="custOrderSearch" placeholder="Search or select customer…" autocomplete="off"
                 oninput="filterCustDropdown(this.value)" onfocus="openCustDropdown()">
@@ -447,20 +459,14 @@ details[open] .sum-chev{transform:rotate(180deg)}
             </div>
             <div class="combo-list" id="custComboList"></div>
           </div>
-          <div class="field-label">Add product</div>
-          <div class="combo-wrap" id="prodComboWrap" style="margin-bottom:8px">
-            <div class="combo-input-row">
-              <input class="combo-input" id="prodSearch" placeholder="Search or select product…" autocomplete="off"
-                oninput="filterProdDropdown(this.value)" onfocus="openProdDropdown()">
-              <button type="button" class="combo-arrow-btn" onclick="toggleProdDropdown()">▼</button>
+          <div class="field-label" style="margin-bottom:8px">Products</div>
+          <div id="prodQtyGrid"></div>
+          <div id="builderSummary" style="display:none;border-top:1.5px solid var(--border);margin-top:4px;padding-top:10px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Order total</span>
+              <span id="builderTotal" style="font-size:16px;font-weight:800;color:var(--red)">₹0.00</span>
             </div>
-            <div class="combo-list" id="prodComboList"></div>
           </div>
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            <input class="p-input" type="number" id="selProdQty" value="1" min="0.5" step="0.5" inputmode="decimal" style="flex:1;min-width:0;margin-bottom:0;padding:10px 6px;text-align:center" aria-label="Quantity">
-            <button class="btn-red" style="flex-shrink:0;width:auto;padding:10px 18px;margin-top:0;white-space:nowrap" onclick="addLineItem()">➕ Add</button>
-          </div>
-          <div id="lineItems" style="display:none;margin-bottom:10px"></div>
           <button class="btn-red" onclick="commitOrder()">Add to orders</button>
         </div>
       </div>
@@ -525,7 +531,7 @@ details[open] .sum-chev{transform:rotate(180deg)}
     <div class="kb-txn-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="kb-txn-label" style="margin-bottom:0">Transaction History</div>
-        <button class="kb-share-stmt-btn" onclick="shareLedgerPDF()">📤 Statement</button>
+        <button class="kb-share-stmt-btn" onclick="openStmtDateModal()">📤 Statement</button>
       </div>
       <div id="kb-txn-list"></div>
     </div>
@@ -599,6 +605,22 @@ details[open] .sum-chev{transform:rotate(180deg)}
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeEditCustModal()">Cancel</button>
       <button class="btn-save-green" onclick="saveEditCust()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATEMENT DATE RANGE MODAL -->
+<div class="modal-overlay" id="stmtDateModal" onclick="if(event.target===this)closeStmtDateModal()">
+  <div class="modal-sheet">
+    <div class="modal-title">📤 Download Statement</div>
+    <label class="field-label">From date</label>
+    <input class="m-input" id="stmtFromDate" type="date">
+    <label class="field-label">To date</label>
+    <input class="m-input" id="stmtToDate" type="date">
+    <div style="font-size:11.5px;color:var(--text3);margin:-4px 0 12px">Leave both blank to include all transactions.</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeStmtDateModal()">Cancel</button>
+      <button class="btn-save-green" onclick="generateStmtPDF()">Download PDF</button>
     </div>
   </div>
 </div>
@@ -1127,14 +1149,14 @@ function confirmAddProduct(){
 
 // ── SELECTS ───────────────────────────────────────────────────────────────────
 let selectedCustName='';
-let selectedProdKey='';
+let selectedProdKey=''; // kept for edit-txn modal compat
 
 function populateSelects(){
-  // Refresh dropdown lists if currently open (e.g. after adding a new customer/product)
+  // Refresh customer dropdown if open
   const ccw=document.getElementById('custComboWrap');
   if(ccw&&ccw.classList.contains('open')) filterCustDropdown(document.getElementById('custOrderSearch').value);
-  const pcw=document.getElementById('prodComboWrap');
-  if(pcw&&pcw.classList.contains('open')) filterProdDropdown(document.getElementById('prodSearch').value);
+  // Always refresh the product grid (products may have been added/edited)
+  renderProdQtyGrid();
 }
 
 function custOptionHtml(list){
@@ -1143,15 +1165,7 @@ function custOptionHtml(list){
       <div>${c.name}</div>${c.phone?`<div class="combo-opt-sub">${c.phone}</div>`:''}
     </div>`).join('');
 }
-function prodOptionHtml(list){
-  if(!list.length) return '<div class="combo-empty">No products found</div>';
-  return list.map(p=>`<div class="combo-opt" onmousedown="event.preventDefault()" onclick="selectProduct('${p.key}')">
-      <div>${p.name}</div><div class="combo-opt-sub">${p.unit}${p.price?' · '+fmt(p.price):''}</div>
-    </div>`).join('');
-}
 
-// Fallback for browsers without CSS :has() support — directly toggles
-// overflow:visible on the ancestor .card so the dropdown isn't clipped.
 function setComboCardOverflow(wrapEl,open){
   const card=wrapEl.closest('.card');
   if(card) card.style.overflow=open?'visible':'';
@@ -1185,41 +1199,10 @@ function selectCustomer(name){
   closeCustDropdown();
 }
 
-function filterProdDropdown(q){
-  const lq=q.toLowerCase();
-  const list=products.filter(p=>p.name.toLowerCase().includes(lq)||(p.unit||'').toLowerCase().includes(lq));
-  document.getElementById('prodComboList').innerHTML=prodOptionHtml(list);
-  const w=document.getElementById('prodComboWrap');
-  w.classList.add('open');setComboCardOverflow(w,true);
-  if(!q) selectedProdKey='';
-}
-function openProdDropdown(){
-  document.getElementById('prodComboList').innerHTML=prodOptionHtml(products);
-  const w=document.getElementById('prodComboWrap');
-  w.classList.add('open');setComboCardOverflow(w,true);
-}
-function toggleProdDropdown(){
-  const w=document.getElementById('prodComboWrap');
-  if(w.classList.contains('open')){closeProdDropdown();}
-  else{document.getElementById('prodSearch').focus();openProdDropdown();}
-}
-function closeProdDropdown(){
-  const w=document.getElementById('prodComboWrap');
-  w.classList.remove('open');setComboCardOverflow(w,false);
-}
-function selectProduct(key){
-  selectedProdKey=key;
-  const p=products.find(x=>x.key===key);
-  document.getElementById('prodSearch').value=p?p.name:'';
-  closeProdDropdown();
-}
-
-// Close dropdowns when tapping outside of them
+// Close customer dropdown when tapping outside
 document.addEventListener('click',function(e){
   const ccw=document.getElementById('custComboWrap');
-  const pcw=document.getElementById('prodComboWrap');
   if(ccw&&!ccw.contains(e.target))closeCustDropdown();
-  if(pcw&&!pcw.contains(e.target))closeProdDropdown();
 });
 
 // ── ORDER BUILDER ─────────────────────────────────────────────────────────────
@@ -1230,54 +1213,96 @@ function fmtQty(n){
   return w+'½';
 }
 
-function addLineItem(){
-  const pk=selectedProdKey;if(!pk){showToast('Select a product first.');return;}
-  const prod=products.find(p=>p.key===pk);if(!prod)return;
-  const qty=Math.max(0.5,parseFloat(document.getElementById('selProdQty').value)||1);
-  const ex=builderItems.find(i=>i.prod.key===pk);
-  if(ex){ex.qty=Math.round((ex.qty+qty)*2)/2;}else{builderItems.push({prod,qty});}
-  renderLineItems();
-  selectedProdKey='';
-  document.getElementById('prodSearch').value='';
-  document.getElementById('selProdQty').value=1;
-}
-function renderLineItems(){
-  const el=document.getElementById('lineItems');
-  document.getElementById('builderCount').textContent=builderItems.length+' item'+(builderItems.length!==1?'s':'');
-  if(!builderItems.length){el.style.display='none';return;}
-  el.style.display='block';
-  const total=builderItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
-  el.innerHTML=builderItems.map((item,i)=>{
-    const price=parseFloat(item.prod.price)||0;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">${item.prod.name}</div>
-        <div style="font-size:11px;color:var(--text3)">${item.prod.unit} · <span class="mono">${item.prod.sid}</span></div>
+// ── PRODUCT QTY GRID (replaces combo+add flow) ───────────────────────────────
+// prodQtys: map of product key → qty (0 = not ordered)
+let prodQtys={};
+
+function renderProdQtyGrid(){
+  const el=document.getElementById('prodQtyGrid');
+  if(!el)return;
+  if(!products.length){
+    el.innerHTML='<div style="padding:14px 0;font-size:13px;color:var(--text3);text-align:center">No products yet — add them in the Prices tab.</div>';
+    return;
+  }
+  el.innerHTML=products.map((p,i)=>{
+    const qty=prodQtys[p.key]||0;
+    const price=parseFloat(p.price)||0;
+    return `<div class="pqg-row">
+      <div class="pqg-info">
+        <div class="pqg-name">${p.name}</div>
+        <div class="pqg-sub">${p.unit}${price?' · '+fmt(price):''}${qty?' · '+fmt(price*qty):''}</div>
       </div>
-      <div class="qty-ctrl">
-        <button class="qty-btn" onclick="chgQty(${i},-0.5)">−</button>
-        <span class="qty-val">${fmtQty(item.qty)}</span>
-        <button class="qty-btn" onclick="chgQty(${i},0.5)">+</button>
+      <div class="pqg-stepper${qty?' active':''}">
+        <button class="pqg-btn" onmousedown="event.preventDefault()" onclick="pqgStep('${p.key}',-0.5)">−</button>
+        <input class="pqg-qty${qty?' nonzero':''}" type="number" min="0" step="0.5" inputmode="decimal" value="${qty||''}" placeholder="0" onchange="pqgSet('${p.key}',this.value)" oninput="pqgSet('${p.key}',this.value)">
+        <button class="pqg-btn" onmousedown="event.preventDefault()" onclick="pqgStep('${p.key}',0.5)">+</button>
       </div>
-      <div style="min-width:60px;text-align:right;font-size:13px;font-weight:700;color:${price?'var(--text)':'var(--text3)'}">${price?fmt(price*item.qty):'—'}</div>
-      <button style="background:var(--red-l);border:1.5px solid var(--red-m);color:var(--red);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:13px;font-family:inherit" onclick="builderItems.splice(${i},1);renderLineItems()">✕</button>
     </div>`;
-  }).join('')+`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 2px;margin-top:2px">
-      <span style="font-size:13px;font-weight:800">Total</span>
-      <span style="font-size:15px;font-weight:900;color:var(--red)">${fmt(total)}</span>
-    </div>`;
+  }).join('');
+  updateBuilderSummary();
 }
-function chgQty(i,d){builderItems[i].qty=Math.max(0.5,Math.round((builderItems[i].qty+d)*2)/2);renderLineItems();}
+
+function pqgStep(key,delta){
+  const cur=prodQtys[key]||0;
+  const next=Math.max(0,Math.round((cur+delta)*2)/2);
+  prodQtys[key]=next;
+  updateBuilderSummary();
+  // Update just this row's stepper without full re-render (prevents keyboard dismissal on mobile)
+  const rows=document.querySelectorAll('.pqg-row');
+  const idx=products.findIndex(p=>p.key===key);
+  if(idx>=0&&rows[idx]){
+    const p=products[idx];
+    const price=parseFloat(p.price)||0;
+    const stepper=rows[idx].querySelector('.pqg-stepper');
+    const input=rows[idx].querySelector('.pqg-qty');
+    const sub=rows[idx].querySelector('.pqg-sub');
+    if(stepper) stepper.className='pqg-stepper'+(next?' active':'');
+    if(input){input.value=next||'';input.className='pqg-qty'+(next?' nonzero':'');}
+    if(sub) sub.textContent=p.unit+(price?' · '+fmt(price):'')+(next?' · '+fmt(price*next):'');
+  }
+}
+
+function pqgSet(key,val){
+  const q=Math.max(0,parseFloat(val)||0);
+  prodQtys[key]=Math.round(q*2)/2;
+  updateBuilderSummary();
+  const rows=document.querySelectorAll('.pqg-row');
+  const idx=products.findIndex(p=>p.key===key);
+  if(idx>=0&&rows[idx]){
+    const p=products[idx];
+    const price=parseFloat(p.price)||0;
+    const qty=prodQtys[key];
+    const stepper=rows[idx].querySelector('.pqg-stepper');
+    const input=rows[idx].querySelector('.pqg-qty');
+    const sub=rows[idx].querySelector('.pqg-sub');
+    if(stepper) stepper.className='pqg-stepper'+(qty?' active':'');
+    if(input) input.className='pqg-qty'+(qty?' nonzero':'');
+    if(sub) sub.textContent=p.unit+(price?' · '+fmt(price):'')+(qty?' · '+fmt(price*qty):'');
+  }
+}
+
+function updateBuilderSummary(){
+  const items=products.filter(p=>(prodQtys[p.key]||0)>0);
+  const total=items.reduce((s,p)=>(parseFloat(p.price)||0)*(prodQtys[p.key]||0)+s,0);
+  const count=items.length;
+  document.getElementById('builderCount').textContent=count+' item'+(count!==1?'s':'');
+  const sumEl=document.getElementById('builderSummary');
+  const totEl=document.getElementById('builderTotal');
+  if(sumEl) sumEl.style.display=count?'block':'none';
+  if(totEl) totEl.textContent=fmt(total);
+}
+
 function commitOrder(){
   const cn=selectedCustName;
   if(!cn){showToast('Select a customer.');return;}
-  if(!builderItems.length){showToast('Add at least one product.');return;}
+  const items=products.filter(p=>(prodQtys[p.key]||0)>0).map(p=>({prod:p,qty:prodQtys[p.key]}));
+  if(!items.length){showToast('Set quantity for at least one product.');return;}
   let o=orders.find(x=>x.custName===cn);
-  if(o){builderItems.forEach(bi=>{const ex=o.items.find(i=>i.prod.key===bi.prod.key);if(ex)ex.qty+=bi.qty;else o.items.push({...bi});});}
-  else orders.push({custName:cn,items:builderItems.map(i=>({...i})),posted:false,date:today()});
-  builderItems=[];renderLineItems();renderActiveOrders();saveState();
+  if(o){items.forEach(bi=>{const ex=o.items.find(i=>i.prod.key===bi.prod.key);if(ex)ex.qty+=bi.qty;else o.items.push({...bi});});}
+  else orders.push({custName:cn,items,posted:false,date:today()});
+  prodQtys={};renderProdQtyGrid();renderActiveOrders();saveState();
   selectedCustName='';document.getElementById('custOrderSearch').value='';
-  selectedProdKey='';document.getElementById('prodSearch').value='';document.getElementById('selProdQty').value=1;
+  showToast('Order added for '+cn+'.');
 }
 function renderActiveOrders(){
   const card=document.getElementById('activeOrdersCard');
@@ -1596,7 +1621,50 @@ function pdfHeader(doc,title,subtitle){
   doc.setTextColor(30,30,30);
 }
 
-async function shareLedgerPDF(){
+function openStmtDateModal(){
+  // Default: today as To, 30 days ago as From
+  const now=new Date();
+  const to=now.toISOString().split('T')[0];
+  const from=new Date(now-30*864e5).toISOString().split('T')[0];
+  document.getElementById('stmtFromDate').value=from;
+  document.getElementById('stmtToDate').value=to;
+  document.getElementById('stmtDateModal').classList.add('open');
+}
+function closeStmtDateModal(){document.getElementById('stmtDateModal').classList.remove('open');}
+
+async function generateStmtPDF(){
+  const c=customers[activeCustIdx];if(!c)return;
+  const fromStr=document.getElementById('stmtFromDate').value;
+  const toStr=document.getElementById('stmtToDate').value;
+  closeStmtDateModal();
+
+  // Parse "DD Mon YYYY, HH:MM AM/PM" — the date format used throughout the app
+  const parseEntryDate=s=>{
+    if(!s)return null;
+    const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const m=s.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
+    return m?new Date(+m[3],months[m[2]]||0,+m[1]):null;
+  };
+
+  const fromDate=fromStr?new Date(fromStr):null;
+  const toDate=toStr?new Date(toStr+(fromStr?' 23:59:59':'')):null;
+  if(toDate) toDate.setHours(23,59,59,999);
+
+  const filtered=fromDate||toDate
+    ?c.ledger.filter(t=>{
+        const d=parseEntryDate(t.date);
+        if(!d)return true;
+        if(fromDate&&d<fromDate)return false;
+        if(toDate&&d>toDate)return false;
+        return true;
+      })
+    :c.ledger;
+
+  const rangeLabel=fromStr&&toStr?fromStr+' → '+toStr:fromStr?'From '+fromStr:toStr?'Up to '+toStr:'All time';
+  await shareLedgerPDF(filtered,rangeLabel);
+}
+
+async function shareLedgerPDF(filteredEntries,rangeLabel){
   const c=customers[activeCustIdx];
   if(!c){showToast('No customer selected.');return;}
   showToast('Generating PDF…');
@@ -1604,11 +1672,14 @@ async function shareLedgerPDF(){
   try{JsPDF=await loadJsPDF();}
   catch(e){showToast('Could not load PDF library. Check internet.');return;}
 
+  const entries=Array.isArray(filteredEntries)?filteredEntries:c.ledger;
+  const label=rangeLabel||'All time';
+
   const doc=new JsPDF({unit:'mm',format:'a4'});
   const bal=custBal(c);
   const balTxt=bal===0?'Settled up — Rs.0.00':bal>0?'Customer owes '+rs(bal):'You owe customer '+rs(-bal);
 
-  pdfHeader(doc,'Account Statement','Generated: '+today());
+  pdfHeader(doc,'Account Statement','Period: '+label);
 
   // customer info box
   doc.setFillColor(245,245,247);
@@ -1616,18 +1687,18 @@ async function shareLedgerPDF(){
   doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
   doc.text(c.name,19,46.5);
   doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);
-  doc.text((c.phone||'No phone')+' · '+c.ledger.length+' transaction'+(c.ledger.length!==1?'s':''),19,52);
+  doc.text((c.phone||'No phone')+' · '+entries.length+' transaction'+(entries.length!==1?'s':''),19,52);
   doc.setFont('helvetica','bold');
   const balColor=bal===0?[100,100,100]:bal>0?[232,25,44]:[26,158,95];
   doc.setTextColor(...balColor);
   doc.text(balTxt,196,46.5,{align:'right'});
   doc.setTextColor(30,30,30);
 
-  if(!c.ledger.length){
+  if(!entries.length){
     doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(150,150,150);
-    doc.text('No transactions yet.',105,80,{align:'center'});
+    doc.text('No transactions in this date range.',105,80,{align:'center'});
   } else {
-    const rows=[...c.ledger].reverse().map(t=>{
+    const rows=[...entries].reverse().map(t=>{
       const isGave=!!t.dr;
       return [t.date,isGave?'You Gave':'You Got',t.note||'—',isGave?'-'+rs(t.dr):'+'+rs(t.cr)];
     });
@@ -1939,7 +2010,7 @@ window.switchAuthTab=function(t){
 // ── INIT ────────────────────────────────────────────────────────────────────
 // Do NOT loadState() here — Firebase auth listener handles data loading per user
 // Just render empty state while waiting for auth
-renderCustomers();renderPrices();populateSelects();renderActiveOrders();
+renderCustomers();renderPrices();populateSelects();renderActiveOrders();renderProdQtyGrid();
 
 // ── EXPOSE FUNCTIONS TO GLOBAL SCOPE (required for inline onclick handlers) ──
 window.mgo=mgo;
@@ -1952,15 +2023,12 @@ window.filterCustDropdown=filterCustDropdown;
 window.openCustDropdown=openCustDropdown;
 window.toggleCustDropdown=toggleCustDropdown;
 window.selectCustomer=selectCustomer;
-window.filterProdDropdown=filterProdDropdown;
-window.openProdDropdown=openProdDropdown;
-window.toggleProdDropdown=toggleProdDropdown;
-window.selectProduct=selectProduct;
+window.renderProdQtyGrid=renderProdQtyGrid;
+window.pqgStep=pqgStep;
+window.pqgSet=pqgSet;
 window.closeEditCustModal=closeEditCustModal;
 window.saveEditCust=saveEditCust;
 window.quickAddCust=quickAddCust;
-window.addLineItem=addLineItem;
-window.chgQty=chgQty;
 window.clearBills=clearBills;
 window.clearOrders=clearOrders;
 window.closeConfirmModal=closeConfirmModal;
@@ -1993,12 +2061,14 @@ window.openPriceModal=openPriceModal;
 window.postBillToLedger=postBillToLedger;
 window.removeProduct=removeProduct;
 window.renderActiveOrders=renderActiveOrders;
-window.renderLineItems=renderLineItems;
 window.runConfirmOk=runConfirmOk;
 window.saveGave=saveGave;
 window.saveGot=saveGot;
 window.saveState=saveState;
 window.shareBillPDF=shareBillPDF;
+window.openStmtDateModal=openStmtDateModal;
+window.closeStmtDateModal=closeStmtDateModal;
+window.generateStmtPDF=generateStmtPDF;
 window.shareLedgerPDF=shareLedgerPDF;
 window.updatePriceCount=updatePriceCount;
 </script>
