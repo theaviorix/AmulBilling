@@ -263,15 +263,20 @@ details[open] .sum-chev{transform:rotate(180deg)}
 .kb-txn-amt.gave{color:var(--red)}
 .kb-txn-amt.got{color:var(--green)}
 .kb-txn-actions{display:flex;gap:12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.kb-txn-edit{background:none;border:none;color:#1d4ed8;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;padding:0}
 .kb-txn-edit{background:none;border:none;color:#4a4a48;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;padding:0}
 .kb-txn-del{background:none;border:none;color:var(--red);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;padding:0}
 .kb-share-stmt-btn{background:#f2f2f0;border:1.5px solid #c9c9c5;color:#0f0f10;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
 .kb-share-stmt-btn:active{background:#c9c9c5}
-.bill-pdf-btn{display:flex;align-items:center;gap:6px;background:#f2f2f0;border:1.5px solid #c9c9c5;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:#0f0f10;cursor:pointer;font-family:inherit;justify-content:center;transition:background .15s;width:100%}
+.bill-pdf-btn{display:flex;align-items:center;gap:6px;background:#f2f2f0;border:1.5px solid #c9c9c5;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:#0f0f10;cursor:pointer;font-family:inherit;justify-content:center;transition:background .15s}
 .bill-pdf-btn:active{background:#c9c9c5}
+.bill-edit-btn{display:flex;align-items:center;gap:6px;background:#eef4ff;border:1.5px solid #b9d2ff;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:#1d4ed8;cursor:pointer;font-family:inherit;justify-content:center;transition:background .15s}
+.bill-edit-btn:active{background:#d9e6ff}
 .dl-all-btn{width:100%;background:#0f0f10;border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;letter-spacing:.01em;box-shadow:0 2px 8px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;gap:6px}
 .dl-all-btn:active{opacity:.8}
-.inv-btn-row{display:flex;gap:8px;margin-top:0}
+.inv-btn-row{display:flex;gap:8px;margin-top:0;flex-wrap:wrap}
+.inv-btn-row .post-btn{flex:1 1 100%}
+.inv-btn-row .bill-pdf-btn,.inv-btn-row .bill-edit-btn,.inv-btn-row .bill-del-btn{flex:1;min-width:0}
 .kb-txn-items{margin-top:4px;font-size:11.5px;color:var(--text2);line-height:1.6}
 .kb-txn-items span{display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 6px;margin:2px 3px 2px 0;font-weight:600}
 
@@ -329,6 +334,18 @@ details[open] .sum-chev{transform:rotate(180deg)}
 .m-input:focus{border-color:#0f0f10}
 .modal-btns{display:flex;gap:8px}
 .modal-btns .btn-save-red{flex:1}
+
+/* EDIT BILL / EDIT TXN ITEM ROWS */
+.edit-item-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)}
+.edit-item-row:last-child{border-bottom:none}
+.edit-item-info{flex:1;min-width:0}
+.edit-item-name{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edit-item-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.edit-item-qty{width:60px;flex-shrink:0;border:1.5px solid var(--border);border-radius:8px;padding:7px 4px;font-size:13px;font-family:inherit;text-align:center;outline:none}
+.edit-item-qty:focus{border-color:#0f0f10}
+.edit-item-rm{flex-shrink:0;width:30px;height:30px;border-radius:8px;border:1.5px solid var(--red-m);background:var(--red-l);color:var(--red);font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center}
+.edit-item-rm:active{background:var(--red-m)}
+.edit-item-empty{padding:20px 0;text-align:center;font-size:13px;color:var(--text3)}
 
 .flag{background:#fff8ec;border:1px solid #ffe08a;border-radius:10px;padding:9px 12px;display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
 .flag-text{font-size:12px;color:#8a5a00;line-height:1.5}
@@ -586,6 +603,52 @@ details[open] .sum-chev{transform:rotate(180deg)}
   </div>
 </div>
 
+<!-- EDIT TRANSACTION MODAL -->
+<div class="modal-overlay" id="editTxnModal" onclick="if(event.target===this)closeEditTxnModal()">
+  <div class="modal-sheet" style="max-height:82vh;overflow-y:auto">
+    <div class="modal-title" id="editTxnTitle">✏️ Edit Transaction</div>
+
+    <!-- Plain txn fields (shown for non-bill entries) -->
+    <div id="editTxnPlainFields">
+      <label class="field-label">Amount (₹)</label>
+      <input class="m-input" id="editTxnAmt" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+      <label class="field-label">Description</label>
+      <input class="m-input" id="editTxnNote" type="text" placeholder="Optional note…">
+    </div>
+
+    <!-- Bill-post fields (shown for entries with items) -->
+    <div id="editTxnBillFields" style="display:none">
+      <div id="editTxnItemsList"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1.5px solid var(--border);margin-top:8px;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:700;color:var(--text2)">New total</span>
+        <span id="editTxnGrandTotal" style="font-size:17px;font-weight:800;color:var(--red)">₹0.00</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:12px">⚠️ This also updates the bill in the Bills tab.</div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeEditTxnModal()">Cancel</button>
+      <button class="btn-save-green" onclick="saveEditTxn()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT BILL MODAL -->
+<div class="modal-overlay" id="editBillModal" onclick="if(event.target===this)closeEditBillModal()">
+  <div class="modal-sheet" style="max-height:82vh;overflow-y:auto">
+    <div class="modal-title">✏️ Edit Bill <span id="editBillCustName" style="font-weight:600;color:var(--text3)"></span></div>
+    <div id="editBillItemsList"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1.5px solid var(--border);margin-top:8px;margin-bottom:14px">
+      <span style="font-size:13px;font-weight:700;color:var(--text2)">New grand total</span>
+      <span id="editBillGrandTotal" style="font-size:17px;font-weight:800;color:var(--red)">₹0.00</span>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeEditBillModal()">Cancel</button>
+      <button class="btn-save-green" onclick="saveEditBill()">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- REUSABLE CONFIRM / PROMPT MODAL (replaces native confirm/prompt, which iOS standalone web-apps block) -->
 <div class="modal-overlay" id="confirmModal" onclick="if(event.target===this)closeConfirmModal()">
   <div class="modal-sheet">
@@ -611,12 +674,12 @@ let orders=[];
 let bills=[];
 let builderItems=[];
 let activeCustIdx=-1;
-let manifestCleared=false;
+let manifestBaseline=0; // bills[] index — manifest/stats only count bills from this index onward
 
 // ── FIREBASE BRIDGE ─────────────────────────────────────────────────────────
 // Shared state object written by the Firebase module, read by _applyAppState
 window._appState = {
-  customers: [], products: [], orders: [], bills: [], manifestCleared: false
+  customers: [], products: [], orders: [], bills: [], manifestBaseline: 0
 };
 // Called by Firebase module after loading cloud data — syncs into local vars & re-renders
 window._applyAppState = function() {
@@ -624,7 +687,7 @@ window._applyAppState = function() {
   products        = window._appState.products;
   orders          = window._appState.orders;
   bills           = window._appState.bills;
-  manifestCleared = window._appState.manifestCleared;
+  manifestBaseline = window._appState.manifestBaseline||0;
   renderCustomers();
   renderPrices();
   populateSelects();
@@ -678,7 +741,7 @@ function runConfirmOk(){
 // ── PERSISTENCE (localStorage) ────────────────────────────────────────────────
 const STORAGE_KEY='amulcalc_ultra_pro_v1';
 function saveState(){
-  const data={customers,products,orders,bills,manifestCleared};
+  const data={customers,products,orders,bills,manifestBaseline};
   if(window._cloudSave) window._cloudSave(data);
   // localStorage intentionally skipped — per-user data lives in Firebase only
 }
@@ -691,7 +754,7 @@ function loadState(){
     if(Array.isArray(data.products))products=data.products;
     if(Array.isArray(data.orders))orders=data.orders;
     if(Array.isArray(data.bills))bills=data.bills;
-    if(data.manifestCleared!==undefined)manifestCleared=data.manifestCleared;
+    if(data.manifestBaseline!==undefined)manifestBaseline=data.manifestBaseline;
   }catch(e){/* corrupt/unavailable storage — start fresh */}
 }
 
@@ -858,6 +921,7 @@ function renderTxnList(){
         <div class="kb-txn-amt ${isGave?'gave':'got'}">${isGave?'-':'+'} ${fmt(isGave?t.dr:t.cr)}</div>
       </div>
       <div class="kb-txn-actions">
+        <button class="kb-txn-edit" onclick="openEditTxnModal(${i})">✏️ Edit</button>
         <button class="kb-txn-del" onclick="deleteTxn(${i})">🗑️ Delete</button>
       </div>
     </div>`;
@@ -869,6 +933,115 @@ async function deleteTxn(i){
   if(!ok)return;
   customers[activeCustIdx].ledger.splice(i,1);
   renderLedgerBal();renderTxnList();renderCustomers();saveState();
+}
+
+// ── EDIT TRANSACTION ─────────────────────────────────────────────────────────
+let editingTxnIdx=-1;
+let editingTxnBillItems=[]; // working copy when editing a bill-post entry
+
+function openEditTxnModal(i){
+  const c=customers[activeCustIdx];
+  const t=c.ledger[i];if(!t)return;
+  editingTxnIdx=i;
+  const isBillPost=!!(t.items&&t.items.length);
+  const isGave=!!t.dr;
+
+  document.getElementById('editTxnTitle').textContent='✏️ Edit '+(isGave?'Debit':'Credit')+' Transaction';
+
+  if(isBillPost){
+    // Bill-post entry: show item editor (same UX as edit bill modal)
+    document.getElementById('editTxnPlainFields').style.display='none';
+    document.getElementById('editTxnBillFields').style.display='block';
+
+    // Resolve items back to full product objects from products[] using sid or key
+    editingTxnBillItems=t.items.map(si=>{
+      const prod=products.find(p=>p.sid===si.sid||p.key===si.sid)||{name:si.sid,unit:'',price:0,sid:si.sid,key:si.sid};
+      return {prod,qty:si.qty};
+    });
+    renderEditTxnBillItems();
+  } else {
+    document.getElementById('editTxnPlainFields').style.display='block';
+    document.getElementById('editTxnBillFields').style.display='none';
+    document.getElementById('editTxnAmt').value=isGave?t.dr:t.cr;
+    document.getElementById('editTxnNote').value=t.note||'';
+  }
+  document.getElementById('editTxnModal').classList.add('open');
+  if(!isBillPost) setTimeout(()=>document.getElementById('editTxnAmt').focus(),150);
+}
+
+function closeEditTxnModal(){
+  document.getElementById('editTxnModal').classList.remove('open');
+  editingTxnIdx=-1;editingTxnBillItems=[];
+}
+
+function renderEditTxnBillItems(){
+  const el=document.getElementById('editTxnItemsList');
+  if(!editingTxnBillItems.length){
+    el.innerHTML='<div class="edit-item-empty">No items. Save will zero the amount or cancel to keep as-is.</div>';
+  } else {
+    el.innerHTML=editingTxnBillItems.map((it,idx)=>{
+      const price=parseFloat(it.prod.price)||0;
+      return `<div class="edit-item-row">
+        <div class="edit-item-info">
+          <div class="edit-item-name">${it.prod.name||it.prod.sid}</div>
+          <div class="edit-item-sub">${it.prod.unit||''} · ${price?fmt(price)+' each':'no price'}</div>
+        </div>
+        <input class="edit-item-qty" type="number" min="0.5" step="0.5" inputmode="decimal" value="${it.qty}" onchange="updEditTxnQty(${idx},this.value)">
+        <button class="edit-item-rm" onclick="rmEditTxnItem(${idx})">🗑️</button>
+      </div>`;
+    }).join('');
+  }
+  updEditTxnTotal();
+}
+function updEditTxnQty(idx,val){
+  const q=Math.max(0.5,parseFloat(val)||0.5);
+  editingTxnBillItems[idx].qty=Math.round(q*2)/2;
+  updEditTxnTotal();
+}
+function rmEditTxnItem(idx){
+  editingTxnBillItems.splice(idx,1);
+  renderEditTxnBillItems();
+}
+function updEditTxnTotal(){
+  const grand=editingTxnBillItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
+  document.getElementById('editTxnGrandTotal').textContent=fmt(grand);
+}
+
+function saveEditTxn(){
+  if(editingTxnIdx<0)return;
+  const c=customers[activeCustIdx];
+  const t=c.ledger[editingTxnIdx];if(!t)return;
+  const isBillPost=!!(t.items&&t.items.length);
+
+  if(isBillPost){
+    if(!editingTxnBillItems.length){showToast('Need at least one item.');return;}
+    const newGrand=editingTxnBillItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
+    if(newGrand<=0){showToast('Grand total must be greater than 0.');return;}
+    const oldDr=t.dr||0;
+
+    // Update ledger entry
+    t.dr=Math.round(newGrand*100)/100;
+    t.items=editingTxnBillItems.map(i=>({sid:i.prod.sid||i.prod.key,qty:i.qty}));
+
+    // Sync back to the linked bill if it exists
+    if(t.billId){
+      const bill=bills.find(b=>b.billId===t.billId);
+      if(bill){
+        bill.items=editingTxnBillItems.map(i=>({prod:i.prod,qty:i.qty}));
+      }
+    }
+  } else {
+    const amt=parseFloat(document.getElementById('editTxnAmt').value);
+    if(!amt||amt<=0){showToast('Enter a valid amount.');return;}
+    const note=document.getElementById('editTxnNote').value.trim();
+    if(t.dr) t.dr=Math.round(amt*100)/100;
+    else     t.cr=Math.round(amt*100)/100;
+    t.note=note;
+  }
+
+  closeEditTxnModal();
+  renderLedgerBal();renderTxnList();renderBills();renderCustomers();saveState();
+  showToast('Transaction updated.');
 }
 
 // ── GAVE PANEL ────────────────────────────────────────────────────────────────
@@ -1130,17 +1303,17 @@ async function clearOrders(){
 async function clearBills(){
   const ok=await openConfirm('Remove all bills from the Bills tab? This cannot be undone.',{title:'Clear all bills',okText:'Clear bills'});
   if(!ok)return;
-  bills=[];renderBills();saveState();
+  bills=[];manifestBaseline=0;renderBills();saveState();
 }
 function confirmOrder(){
   if(!orders.length){showToast('No orders to confirm.');return;}
   // push a deep copy of current orders into confirmed bills
   orders.forEach(o=>{
     const b=JSON.parse(JSON.stringify(o));
+    b.billId=b.billId||('b'+Date.now()+Math.random().toString(36).slice(2,7));
     bills.push(b);
   });
   orders=[];
-  manifestCleared=false;
   renderActiveOrders();
   saveState();
   mgo('bills');renderBills();
@@ -1153,11 +1326,13 @@ function postBillToLedger(oi){
   const o=bills[oi];if(!o||o.posted)return;
   const cust=customers.find(c=>c.name===o.custName);
   if(!cust){showToast('Customer not in ledger.');return;}
+  if(!o.billId) o.billId='b'+Date.now()+Math.random().toString(36).slice(2,7);
   const grand=calcGrand(o);
   cust.ledger.push({
     date:today(),dr:grand,
     items:o.items.map(i=>({sid:i.prod.sid,qty:i.qty})),
-    note:'Bill post'
+    note:'Bill post',
+    billId:o.billId
   });
   o.posted=true;
   renderCustomers();renderBills();saveState();
@@ -1170,8 +1345,10 @@ function renderBills(){
     out.innerHTML=`<div class="empty"><span class="empty-icon">📄</span><div class="empty-title">No bills yet</div><div class="empty-sub">Add orders then confirm.</div></div>`;
     return;
   }
+  // Manifest & stat-strip only consider bills confirmed AFTER the last manifest reset
+  const billsForManifest=bills.slice(Math.min(manifestBaseline,bills.length));
   const manifest={};const flags=[];let totalRev=0,totalUnits=0;
-  bills.forEach(o=>{
+  billsForManifest.forEach(o=>{
     o.items.forEach(item=>{
       const p=item.prod;const price=parseFloat(p.price)||0;
       if(!price)flags.push('Price not set for <b>'+p.name+' '+p.unit+'</b>');
@@ -1183,7 +1360,7 @@ function renderBills(){
 
   const stripHtml=`<div class="stat-strip">
     <div class="stat-pills-row">
-      <div class="stat-pill"><div class="stat-val">${bills.length}</div><div class="stat-lbl">Shops</div></div>
+      <div class="stat-pill"><div class="stat-val">${billsForManifest.length}</div><div class="stat-lbl">Shops</div></div>
       <div class="stat-pill"><div class="stat-val">${fmtQty(totalUnits)}</div><div class="stat-lbl">Units</div></div>
       <div class="stat-pill"><div class="stat-val" style="font-size:${totalRev>=10000?'13px':'18px'}">₹${Math.round(totalRev)}</div><div class="stat-lbl">Revenue</div></div>
     </div>
@@ -1198,9 +1375,10 @@ function renderBills(){
     const cs=cr>0?(rem>0?`${cr} crate${cr>1?'s':''} + ${rem} units`:`${cr} crate${cr>1?'s':''}`):`${rem} units`;
     return `<tr><td><span class="pname">${m.name}</span><span class="psmall">${m.unit}</span></td><td><span class="qty-badge">${fmtQty(m.qty)}</span></td><td style="font-size:11px;color:#0e7a47;font-weight:600">${cs}</td></tr>`;
   }).join('');
+  const manifestEmpty=!Object.keys(manifest).length;
   const manifestHtml=`<div class="manifest-card">
     <div class="manifest-hdr">📦 <span>Stock Dispatch Manifest</span><button onclick="downloadManifestPDF()" style="margin-left:auto;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📥 PDF</button><button onclick="clearManifest()" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:6px">🗑️ Clear</button></div>
-    <table class="m-table"><tr><th>Product</th><th>Total</th><th>Packing</th></tr>${mRows}</table>
+    ${manifestEmpty?'<div style="padding:14px 4px;font-size:13px;color:rgba(255,255,255,.75);text-align:center">No dispatch since last reset.</div>':`<table class="m-table"><tr><th>Product</th><th>Total</th><th>Packing</th></tr>${mRows}</table>`}
   </div>`;
 
   const searchHtml=`<div class="search-bar"><span>🔍</span><input type="text" id="billSearch" placeholder="Search customer…" oninput="filterBills(this.value)"></div>`;
@@ -1257,7 +1435,7 @@ function renderBills(){
             ${rows}
             <tr class="tr-total"><td colspan="3">Grand total</td><td>${fmt(grand)}</td></tr>
           </table>
-          <div class="inv-btn-row">${postBtn}<button class="bill-pdf-btn" onclick="shareBillPDF(${oi})">📤 PDF</button><button class="bill-del-btn" onclick="deleteBill(${oi})">🗑️</button></div>
+          <div class="inv-btn-row">${postBtn}<button class="bill-pdf-btn" onclick="shareBillPDF(${oi})">📤 PDF</button><button class="bill-edit-btn" onclick="openEditBillModal(${oi})">✏️ Edit</button><button class="bill-del-btn" onclick="deleteBill(${oi})">🗑️</button></div>
         </div>
       </details>`;
     });
@@ -1265,7 +1443,7 @@ function renderBills(){
   });
   invoicesHtml+='</div>';
 
-  out.innerHTML=stripHtml+(manifestCleared?'':manifestHtml)+searchHtml+flagsHtml+invoicesHtml;
+  out.innerHTML=stripHtml+manifestHtml+searchHtml+flagsHtml+invoicesHtml;
 }
 
 async function deleteBill(oi){
@@ -1274,8 +1452,90 @@ async function deleteBill(oi){
   const ok=await openConfirm('Delete bill for '+o.custName+'? This cannot be undone.',{title:'Delete bill',okText:'Delete'});
   if(!ok)return;
   bills.splice(oi,1);
+  if(oi<manifestBaseline) manifestBaseline=Math.max(0,manifestBaseline-1);
   renderBills();saveState();
   showToast('Bill deleted.');
+}
+
+// ── EDIT BILL ────────────────────────────────────────────────────────────────
+let editingBillIdx=-1;
+let editingBillItems=[]; // working copy of {prod,qty}
+
+function openEditBillModal(oi){
+  const o=bills[oi];if(!o)return;
+  editingBillIdx=oi;
+  editingBillItems=o.items.map(i=>({prod:i.prod,qty:i.qty}));
+  document.getElementById('editBillCustName').textContent='— '+o.custName;
+  renderEditBillItems();
+  document.getElementById('editBillModal').classList.add('open');
+}
+function closeEditBillModal(){
+  document.getElementById('editBillModal').classList.remove('open');
+  editingBillIdx=-1;editingBillItems=[];
+}
+function renderEditBillItems(){
+  const el=document.getElementById('editBillItemsList');
+  if(!editingBillItems.length){
+    el.innerHTML='<div class="edit-item-empty">No items left. Add at least one product or cancel.</div>';
+  } else {
+    el.innerHTML=editingBillItems.map((it,idx)=>{
+      const price=parseFloat(it.prod.price)||0;
+      return `<div class="edit-item-row">
+        <div class="edit-item-info">
+          <div class="edit-item-name">${it.prod.name}</div>
+          <div class="edit-item-sub">${it.prod.unit} · ${price?fmt(price)+' each':'no price set'}</div>
+        </div>
+        <input class="edit-item-qty" type="number" min="0.5" step="0.5" inputmode="decimal" value="${it.qty}" onchange="updEditBillQty(${idx},this.value)">
+        <button class="edit-item-rm" onclick="rmEditBillItem(${idx})">🗑️</button>
+      </div>`;
+    }).join('');
+  }
+  updEditBillTotal();
+}
+function updEditBillQty(idx,val){
+  const q=Math.max(0.5,parseFloat(val)||0.5);
+  editingBillItems[idx].qty=Math.round(q*2)/2; // snap to nearest 0.5, matches rest of app
+  updEditBillTotal();
+}
+function rmEditBillItem(idx){
+  editingBillItems.splice(idx,1);
+  renderEditBillItems();
+}
+function updEditBillTotal(){
+  const grand=editingBillItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
+  document.getElementById('editBillGrandTotal').textContent=fmt(grand);
+}
+
+function saveEditBill(){
+  if(editingBillIdx<0)return;
+  const o=bills[editingBillIdx];if(!o)return;
+  if(!editingBillItems.length){showToast('A bill needs at least one item. Delete the bill instead if needed.');return;}
+
+  const oldGrand=calcGrand(o);
+  o.items=editingBillItems.map(i=>({prod:i.prod,qty:i.qty}));
+  const newGrand=calcGrand(o);
+
+  // If this bill was already posted to the customer's Khatabook ledger,
+  // keep that ledger entry mathematically in sync with the edited bill.
+  if(o.posted){
+    const cust=customers.find(c=>c.name===o.custName);
+    if(cust){
+      let entry=o.billId?cust.ledger.find(t=>t.billId===o.billId):null;
+      // Fallback for bills posted before billId tracking existed: match by note+old amount, only once
+      if(!entry){
+        entry=cust.ledger.find(t=>t.note==='Bill post'&&Math.abs((t.dr||0)-oldGrand)<0.005&&!t._editedMatch);
+        if(entry){entry._editedMatch=true;if(!o.billId)o.billId='b'+Date.now()+Math.random().toString(36).slice(2,7);entry.billId=o.billId;}
+      }
+      if(entry){
+        entry.dr=newGrand;
+        entry.items=o.items.map(i=>({sid:i.prod.sid,qty:i.qty}));
+      }
+    }
+  }
+
+  closeEditBillModal();
+  renderCustomers();renderBills();saveState();
+  showToast('Bill updated. Total: '+fmt(newGrand)+(o.posted?' (Khatabook synced)':''));
 }
 
 function filterBills(q){
@@ -1463,21 +1723,22 @@ async function shareBillPDF(oi){
 
 
 async function clearManifest(){
-  const ok=await openConfirm('Hide the Stock Dispatch Manifest? Bills will remain untouched.',{title:'Clear manifest',okText:'Clear',danger:false});
+  const ok=await openConfirm('Reset the Stock Dispatch Manifest and stats to 0? Bills will remain untouched — only newly confirmed orders will count from now on.',{title:'Clear manifest',okText:'Clear',danger:false});
   if(!ok)return;
-  manifestCleared=true;saveState();renderBills();
-  showToast('Manifest cleared.');
+  manifestBaseline=bills.length;saveState();renderBills();
+  showToast('Manifest and stats reset to 0.');
 }
 
 async function downloadManifestPDF(){
-  if(!bills.length){showToast('No bills to export.');return;}
+  const scopedBills=bills.slice(Math.min(manifestBaseline,bills.length));
+  if(!scopedBills.length){showToast('No dispatch since last reset.');return;}
   showToast('Generating manifest PDF…');
   let JsPDF;
   try{JsPDF=await loadJsPDF();}
   catch(e){showToast('Could not load PDF library. Check internet.');return;}
 
   const manifest={};
-  bills.forEach(o=>{
+  scopedBills.forEach(o=>{
     o.items.forEach(item=>{
       const p=item.prod;
       manifest[p.key]=manifest[p.key]||{name:p.name,unit:p.unit,qty:0};
@@ -1492,7 +1753,7 @@ async function downloadManifestPDF(){
   const totalUnits=Object.values(manifest).reduce((s,m)=>s+m.qty,0);
 
   const doc=new JsPDF({unit:'mm',format:'a4'});
-  pdfHeader(doc,'Stock Dispatch Manifest','Date: '+today()+'   Shops: '+bills.length);
+  pdfHeader(doc,'Stock Dispatch Manifest','Date: '+today()+'   Shops: '+scopedBills.length);
 
   doc.autoTable({
     startY:60,
@@ -1712,6 +1973,17 @@ window.confirmAddProduct=confirmAddProduct;
 window.confirmOrder=confirmOrder;
 window.deleteCurrCust=deleteCurrCust;
 window.deleteTxn=deleteTxn;
+window.openEditTxnModal=openEditTxnModal;
+window.closeEditTxnModal=closeEditTxnModal;
+window.saveEditTxn=saveEditTxn;
+window.updEditTxnQty=updEditTxnQty;
+window.rmEditTxnItem=rmEditTxnItem;
+window.openEditBillModal=openEditBillModal;
+window.closeEditBillModal=closeEditBillModal;
+window.saveEditBill=saveEditBill;
+window.updEditBillQty=updEditBillQty;
+window.rmEditBillItem=rmEditBillItem;
+window.deleteBill=deleteBill;
 window.downloadAllBillsPDF=downloadAllBillsPDF;
 window.editCustName=editCustName;
 window.openGavePanel=openGavePanel;
@@ -1846,7 +2118,7 @@ onAuthStateChanged(auth, async (user) => {
       window._appState.products        = Array.isArray(data?.products)  ? data.products  : [];
       window._appState.orders          = Array.isArray(data?.orders)    ? data.orders    : [];
       window._appState.bills           = Array.isArray(data?.bills)     ? data.bills     : [];
-      window._appState.manifestCleared = data?.manifestCleared ?? false;
+      window._appState.manifestBaseline = data?.manifestBaseline ?? 0;
     }
 
     function enterApp() {
@@ -1895,7 +2167,7 @@ onAuthStateChanged(auth, async (user) => {
     window._appState.products        = [];
     window._appState.orders          = [];
     window._appState.bills           = [];
-    window._appState.manifestCleared = false;
+    window._appState.manifestBaseline = 0;
     window._applyAppState();
     setSyncIndicator(false);
     setSubText('Dairy Billing & Dispatch');
