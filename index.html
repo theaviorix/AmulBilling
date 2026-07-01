@@ -1476,7 +1476,7 @@ function renderBills(){
             ${rows}
             <tr class="tr-total"><td colspan="3">Grand total</td><td>${fmt(grand)}</td></tr>
           </table>
-          <div class="inv-btn-row">${postBtn}<button class="bill-pdf-btn" onclick="shareBillPDF(${oi})">📤 PDF</button><button class="bill-edit-btn" onclick="openEditBillModal(${oi})">✏️ Edit</button><button class="bill-del-btn" onclick="deleteBill(${oi})">🗑️</button></div>
+          <div class="inv-btn-row">${postBtn}<button class="bill-edit-btn" onclick="openEditBillModal(${oi})">✏️ Edit</button><button class="bill-del-btn" onclick="deleteBill(${oi})">🗑️</button></div>
         </div>
       </details>`;
     });
