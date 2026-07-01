@@ -2249,6 +2249,18 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
     _uid = user.uid;
 
+    // ── ALLOWLIST CHECK ──────────────────────────────────────────────────────
+    const ALLOWED = ['parth252010@gmail.com', 'babulalsharma15@gmail.com'];
+    if (!ALLOWED.includes((user.email || '').toLowerCase())) {
+      await signOut(auth);
+      document.getElementById('authLoading').style.display = 'none';
+      document.getElementById('authCard').style.display    = 'block';
+      document.getElementById('authError').textContent     = 'Not available for Free Trial';
+      document.getElementById('authError').style.display   = 'block';
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     // Show loading spinner
     document.getElementById('authLoading').style.display = 'block';
     document.getElementById('authCard').style.display   = 'none';
