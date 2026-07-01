@@ -609,6 +609,22 @@ details[open] .sum-chev{transform:rotate(180deg)}
   </div>
 </div>
 
+<!-- BILLS DOWNLOAD DATE RANGE MODAL -->
+<div class="modal-overlay" id="billsDateModal" onclick="if(event.target===this)closeBillsDateModal()">
+  <div class="modal-sheet">
+    <div class="modal-title">📥 Download All Bills</div>
+    <label class="field-label">From date</label>
+    <input class="m-input" id="billsFromDate" type="date">
+    <label class="field-label">To date</label>
+    <input class="m-input" id="billsToDate" type="date">
+    <div style="font-size:11.5px;color:var(--text3);margin:-4px 0 12px">Leave both blank to include all bills.</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeBillsDateModal()">Cancel</button>
+      <button class="btn-save-green" onclick="generateBillsPDF()">Download PDF</button>
+    </div>
+  </div>
+</div>
+
 <!-- STATEMENT DATE RANGE MODAL -->
 <div class="modal-overlay" id="stmtDateModal" onclick="if(event.target===this)closeStmtDateModal()">
   <div class="modal-sheet">
@@ -1390,7 +1406,7 @@ function renderBills(){
       <div class="stat-pill"><div class="stat-val" style="font-size:${totalRev>=10000?'13px':'18px'}">₹${Math.round(totalRev)}</div><div class="stat-lbl">Revenue</div></div>
     </div>
     <div style="display:flex;gap:8px">
-      <button class="dl-all-btn" style="flex:1" onclick="downloadAllBillsPDF()">📥 Download All</button>
+      <button class="dl-all-btn" style="flex:1" onclick="openBillsDateModal()">📥 Download All</button>
       <button class="dl-all-btn" style="flex:1;background:var(--text3);box-shadow:none" onclick="clearBills()">🗑️ Clear Bills</button>
     </div>
   </div>`;
@@ -1638,16 +1654,20 @@ async function generateStmtPDF(){
   const toStr=document.getElementById('stmtToDate').value;
   closeStmtDateModal();
 
-  // Parse "DD Mon YYYY, HH:MM AM/PM" — the date format used throughout the app
+  // Parse input date string (YYYY-MM-DD) as LOCAL midnight to avoid UTC offset issues
+  const parseInput=s=>{if(!s)return null;const[y,m,d]=s.split('-');return new Date(+y,+m-1,+d,0,0,0,0);};
+
+  // Parse the app's stored date format "DD Mon YYYY, HH:MM AM/PM" as local date
   const parseEntryDate=s=>{
     if(!s)return null;
     const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
     const m=s.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
-    return m?new Date(+m[3],months[m[2]]||0,+m[1]):null;
+    return m?new Date(+m[3],months[m[2]]||0,+m[1],0,0,0,0):null;
   };
 
-  const fromDate=fromStr?new Date(fromStr):null;
-  const toDate=toStr?new Date(toStr+(fromStr?' 23:59:59':'')):null;
+  const fromDate=parseInput(fromStr);
+  const toDate=parseInput(toStr);
+  // toDate is end-of-day so same-day works: set to 23:59:59.999
   if(toDate) toDate.setHours(23,59,59,999);
 
   const filtered=fromDate||toDate
@@ -1660,7 +1680,10 @@ async function generateStmtPDF(){
       })
     :c.ledger;
 
-  const rangeLabel=fromStr&&toStr?fromStr+' → '+toStr:fromStr?'From '+fromStr:toStr?'Up to '+toStr:'All time';
+  const fmt2=s=>s?s.split('-').reverse().join('/'):'';
+  const rangeLabel=fromStr||toStr
+    ?(fromStr===toStr?fmt2(fromStr):(fromStr?fmt2(fromStr):'')+' → '+(toStr?fmt2(toStr):''))
+    :'All time';
   await shareLedgerPDF(filtered,rangeLabel);
 }
 
@@ -1847,8 +1870,53 @@ async function downloadManifestPDF(){
   showToast('Downloaded: '+fname);
 }
 
-async function downloadAllBillsPDF(){
+function openBillsDateModal(){
   if(!bills.length){showToast('No bills to export.');return;}
+  const now=new Date();
+  document.getElementById('billsToDate').value=now.toISOString().split('T')[0];
+  document.getElementById('billsFromDate').value=new Date(now-30*864e5).toISOString().split('T')[0];
+  document.getElementById('billsDateModal').classList.add('open');
+}
+function closeBillsDateModal(){document.getElementById('billsDateModal').classList.remove('open');}
+
+async function generateBillsPDF(){
+  const fromStr=document.getElementById('billsFromDate').value;
+  const toStr=document.getElementById('billsToDate').value;
+  closeBillsDateModal();
+
+  const parseInput=s=>{if(!s)return null;const[y,m,d]=s.split('-');return new Date(+y,+m-1,+d,0,0,0,0);};
+  const parseEntryDate=s=>{
+    if(!s)return null;
+    const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const m=s.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
+    return m?new Date(+m[3],months[m[2]]||0,+m[1],0,0,0,0):null;
+  };
+  const fromDate=parseInput(fromStr);
+  const toDate=parseInput(toStr);
+  if(toDate) toDate.setHours(23,59,59,999);
+
+  const filtered=fromDate||toDate
+    ?bills.filter(b=>{
+        const d=parseEntryDate(b.date);
+        if(!d)return true;
+        if(fromDate&&d<fromDate)return false;
+        if(toDate&&d>toDate)return false;
+        return true;
+      })
+    :bills;
+
+  if(!filtered.length){showToast('No bills in that date range.');return;}
+  const fmt2=s=>s?s.split('-').reverse().join('/'):'';
+  const rangeLabel=fromStr||toStr
+    ?(fromStr===toStr?fmt2(fromStr):(fromStr?fmt2(fromStr):'')+' → '+(toStr?fmt2(toStr):''))
+    :'All time';
+  await downloadAllBillsPDF(filtered,rangeLabel);
+}
+
+async function downloadAllBillsPDF(scopedBills,rangeLabel){
+  const billsToUse=Array.isArray(scopedBills)?scopedBills:bills;
+  const label=rangeLabel||'All bills';
+  if(!billsToUse.length){showToast('No bills to export.');return;}
   showToast('Building dispatch sheet…');
   let JsPDF;
   try{JsPDF=await loadJsPDF();}
@@ -1858,7 +1926,7 @@ async function downloadAllBillsPDF(){
   //    Append any deleted products still referenced in bills at the end.
   const prodObjMap=new Map();
   products.forEach(p=>prodObjMap.set(p.key,p));
-  bills.forEach(o=>o.items.forEach(item=>{if(!prodObjMap.has(item.prod.key))prodObjMap.set(item.prod.key,item.prod);}));
+  billsToUse.forEach(o=>o.items.forEach(item=>{if(!prodObjMap.has(item.prod.key))prodObjMap.set(item.prod.key,item.prod);}));
   const masterKeys=products.map(p=>p.key);
   const extraKeys=[...prodObjMap.keys()].filter(k=>!masterKeys.includes(k));
   const prods=[...masterKeys,...extraKeys].map(k=>prodObjMap.get(k));
@@ -1867,7 +1935,7 @@ async function downloadAllBillsPDF(){
   const DASH='';
   const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total','Dues']];
 
-  const body=bills.map(o=>{
+  const body=billsToUse.map(o=>{
     const qtyMap={};
     o.items.forEach(item=>qtyMap[item.prod.key]=item.qty);
     const grand=calcGrand(o);
@@ -1893,13 +1961,13 @@ async function downloadAllBillsPDF(){
 
   // ── Totals footer — dues cell intentionally left blank
   const footerQtys=prods.map(p=>{
-    const t=bills.reduce((s,o)=>{
+    const t=billsToUse.reduce((s,o)=>{
       const item=o.items.find(i=>i.prod.key===p.key);
       return s+(item?item.qty:0);
     },0);
     return t>0?fmtQty(t):DASH;
   });
-  const grandTotal=bills.reduce((s,o)=>s+calcGrand(o),0);
+  const grandTotal=billsToUse.reduce((s,o)=>s+calcGrand(o),0);
   const foot=[['TOTAL',...footerQtys,'Rs.'+grandTotal.toFixed(0),'']];
 
   const doc=new JsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -1913,7 +1981,7 @@ async function downloadAllBillsPDF(){
   doc.setFontSize(10);doc.setFont('helvetica','bold');
   doc.text('Amul Billing — Daily Dispatch Sheet',44,6.5);
   doc.setFontSize(8);doc.setFont('helvetica','normal');
-  doc.text('Date: '+today()+'   Bills: '+bills.length+'   Products: '+prods.length,44,12);
+  doc.text('Period: '+label+'   Bills: '+billsToUse.length+'   Products: '+prods.length,44,12);
   doc.setTextColor(30,30,30);
 
   // dynamic column widths
@@ -2052,6 +2120,9 @@ window.saveEditBill=saveEditBill;
 window.updEditBillQty=updEditBillQty;
 window.rmEditBillItem=rmEditBillItem;
 window.deleteBill=deleteBill;
+window.openBillsDateModal=openBillsDateModal;
+window.closeBillsDateModal=closeBillsDateModal;
+window.generateBillsPDF=generateBillsPDF;
 window.downloadAllBillsPDF=downloadAllBillsPDF;
 window.editCustName=editCustName;
 window.openGavePanel=openGavePanel;
