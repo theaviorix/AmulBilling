@@ -676,25 +676,23 @@ details[open] .sum-chev{transform:rotate(180deg)}
 
 <!-- EDIT BILL MODAL -->
 <div class="modal-overlay" id="editBillModal" onclick="if(event.target===this)closeEditBillModal()">
-  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto" onclick="event.stopPropagation()">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto;padding-bottom:8px" onclick="event.stopPropagation()">
     <div class="modal-title">✏️ Edit Bill <span id="editBillCustName" style="font-weight:600;color:var(--text3)"></span></div>
 
-    <!-- Existing items -->
-    <div class="field-label">Items in bill</div>
+    <!-- Existing items — large rows -->
     <div id="editBillItemsList"></div>
 
-    <!-- Add new products -->
-    <div class="field-label" style="margin-top:12px">Add product to bill</div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-      <select id="editBillAddSelect" style="flex:1;min-width:0;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px 10px;font-size:13px;font-weight:600;color:var(--text);font-family:inherit;outline:none;-webkit-appearance:auto;appearance:auto">
-        <option value="">— pick product —</option>
-      </select>
-      <input id="editBillAddQty" type="number" min="0.5" step="0.5" inputmode="decimal" value="1" style="width:58px;flex-shrink:0;border:1.5px solid var(--border);border-radius:10px;padding:9px 6px;font-size:13px;font-family:inherit;text-align:center;outline:none;background:var(--bg);color:var(--text)">
-      <button onclick="applyEditBillAdds()" style="flex-shrink:0;background:var(--red);border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap">➕ Add</button>
+    <!-- Add new products — collapsible -->
+    <button onclick="toggleEditBillAddSection()" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;margin-top:10px;margin-bottom:0">
+      <span>➕ Add more products</span>
+      <span id="editBillAddArrow" style="font-size:11px;transition:transform .2s">▼</span>
+    </button>
+    <div id="editBillAddSection" style="display:none;border:1.5px solid var(--border);border-top:none;border-radius:0 0 10px 10px;padding:6px 0 2px;margin-bottom:4px">
+      <div id="editBillAddGrid"></div>
     </div>
 
     <!-- Total -->
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1.5px solid var(--border);margin-top:4px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1.5px solid var(--border);margin-top:10px;margin-bottom:14px">
       <span style="font-size:13px;font-weight:700;color:var(--text2)">New grand total</span>
       <span id="editBillGrandTotal" style="font-size:17px;font-weight:800;color:var(--red)">₹0.00</span>
     </div>
@@ -1533,8 +1531,8 @@ async function deleteBill(oi){
 
 // ── EDIT BILL ────────────────────────────────────────────────────────────────
 let editingBillIdx=-1;
-let editingBillItems=[]; // working copy of {prod,qty}
-let editBillAddQtys={};  // key→qty for new products being added
+let editingBillItems=[];
+let editBillAddQtys={};
 
 function openEditBillModal(oi){
   const o=bills[oi];if(!o)return;
@@ -1542,59 +1540,119 @@ function openEditBillModal(oi){
   editingBillItems=o.items.map(i=>({prod:i.prod,qty:i.qty}));
   editBillAddQtys={};
   document.getElementById('editBillCustName').textContent='— '+o.custName;
+  // Collapse the add section on open
+  const sec=document.getElementById('editBillAddSection');
+  const arr=document.getElementById('editBillAddArrow');
+  if(sec){sec.style.display='none';}
+  if(arr){arr.style.transform='rotate(0deg)';}
   renderEditBillItems();
-  populateEditBillSelect();
-  document.getElementById('editBillAddQty').value=1;
+  renderEditBillAddGrid();
   document.getElementById('editBillModal').classList.add('open');
 }
 
-function populateEditBillSelect(){
-  const sel=document.getElementById('editBillAddSelect');
-  if(!sel)return;
-  const existingKeys=new Set(editingBillItems.map(i=>i.prod.key));
-  const addable=products.filter(p=>!existingKeys.has(p.key));
-  sel.innerHTML='<option value="">— pick product —</option>'+
-    addable.map(p=>`<option value="${p.key}">${p.name} (${p.unit})${p.price?' · ₹'+p.price:''}</option>`).join('');
-}
-
-function applyEditBillAdds(){
-  const sel=document.getElementById('editBillAddSelect');
-  const key=sel?sel.value:'';
-  if(!key){showToast('Pick a product first.');return;}
-  const qty=Math.max(0.5,Math.round((parseFloat(document.getElementById('editBillAddQty').value)||1)*2)/2);
-  const prod=products.find(p=>p.key===key);if(!prod)return;
-  const ex=editingBillItems.find(i=>i.prod.key===key);
-  if(ex) ex.qty=Math.round((ex.qty+qty)*2)/2;
-  else editingBillItems.push({prod,qty});
-  // Reset
-  document.getElementById('editBillAddQty').value=1;
-  renderEditBillItems();
-  populateEditBillSelect(); // refresh — added product disappears from dropdown
-  sel.value='';
-}
 function closeEditBillModal(){
   document.getElementById('editBillModal').classList.remove('open');
   editingBillIdx=-1;editingBillItems=[];editBillAddQtys={};
 }
 
+function toggleEditBillAddSection(){
+  const sec=document.getElementById('editBillAddSection');
+  const arr=document.getElementById('editBillAddArrow');
+  const open=sec.style.display==='none';
+  sec.style.display=open?'block':'none';
+  arr.style.transform=open?'rotate(180deg)':'rotate(0deg)';
+}
+
+// ── Large rows for existing items ──────────────────────────────────────────
 function renderEditBillItems(){
   const el=document.getElementById('editBillItemsList');
   if(!editingBillItems.length){
-    el.innerHTML='<div class="edit-item-empty">No items. Add products below or cancel.</div>';
+    el.innerHTML='<div class="edit-item-empty">No items. Expand section below to add products.</div>';
   } else {
     el.innerHTML=editingBillItems.map((it,idx)=>{
       const price=parseFloat(it.prod.price)||0;
-      return `<div class="edit-item-row">
-        <div class="edit-item-info">
-          <div class="edit-item-name">${it.prod.name}</div>
-          <div class="edit-item-sub">${it.prod.unit} · ${price?fmt(price)+' each':'no price set'}</div>
+      const subtotal=price*it.qty;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.prod.name}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${it.prod.unit}${price?' · '+fmt(price)+' each':''}${subtotal?' · <b style="color:var(--red)">'+fmt(subtotal)+'</b>':''}</div>
         </div>
-        <input class="edit-item-qty" type="number" min="0.5" step="0.5" inputmode="decimal" value="${it.qty}" onchange="updEditBillQty(${idx},this.value)">
-        <button class="edit-item-rm" onclick="rmEditBillItem(${idx})">🗑️</button>
+        <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;flex-shrink:0">
+          <button style="width:36px;height:38px;border:none;background:transparent;font-size:20px;font-weight:700;cursor:pointer;color:var(--text2);-webkit-tap-highlight-color:transparent" onmousedown="event.preventDefault()" onclick="ebItemStep(${idx},-0.5)">−</button>
+          <input style="width:42px;border:none;background:transparent;font-size:14px;font-weight:700;text-align:center;font-family:inherit;color:var(--red);outline:none;padding:0" type="number" min="0.5" step="0.5" inputmode="decimal" value="${it.qty}" onchange="updEditBillQty(${idx},this.value)">
+          <button style="width:36px;height:38px;border:none;background:transparent;font-size:20px;font-weight:700;cursor:pointer;color:var(--text2);-webkit-tap-highlight-color:transparent" onmousedown="event.preventDefault()" onclick="ebItemStep(${idx},0.5)">+</button>
+        </div>
+        <button style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--red-m);background:var(--red-l);color:var(--red);font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0;display:flex;align-items:center;justify-content:center" onclick="rmEditBillItem(${idx})">✕</button>
       </div>`;
     }).join('');
   }
   updEditBillTotal();
+}
+
+function ebItemStep(idx,delta){
+  editingBillItems[idx].qty=Math.max(0.5,Math.round((editingBillItems[idx].qty+delta)*2)/2);
+  renderEditBillItems();
+}
+
+// ── Small stepper grid for adding new products ─────────────────────────────
+function renderEditBillAddGrid(){
+  const existingKeys=new Set(editingBillItems.map(i=>i.prod.key));
+  const addable=products.filter(p=>!existingKeys.has(p.key));
+  const el=document.getElementById('editBillAddGrid');
+  if(!el)return;
+  if(!addable.length){
+    el.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--text3)">All products already in bill.</div>';
+    return;
+  }
+  el.innerHTML=addable.map(p=>{
+    const qty=editBillAddQtys[p.key]||0;
+    const price=parseFloat(p.price)||0;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:10.5px;color:var(--text3)">${p.unit}${price?' · '+fmt(price):''}</div>
+      </div>
+      <div style="display:flex;align-items:center;border:1.5px solid ${qty?'var(--red)':'var(--border)'};border-radius:8px;overflow:hidden;flex-shrink:0">
+        <button style="width:30px;height:32px;border:none;background:transparent;font-size:17px;font-weight:700;cursor:pointer;color:var(--text2);-webkit-tap-highlight-color:transparent" onmousedown="event.preventDefault()" onclick="ebAddStep('${p.key}',-0.5)">−</button>
+        <input style="width:34px;border:none;background:transparent;font-size:13px;font-weight:700;text-align:center;font-family:inherit;color:${qty?'var(--red)':'var(--text)'};outline:none;padding:0" type="number" min="0" step="0.5" inputmode="decimal" value="${qty||''}" placeholder="0" onchange="ebAddSet('${p.key}',this.value)">
+        <button style="width:30px;height:32px;border:none;background:transparent;font-size:17px;font-weight:700;cursor:pointer;color:var(--text2);-webkit-tap-highlight-color:transparent" onmousedown="event.preventDefault()" onclick="ebAddStep('${p.key}',0.5)">+</button>
+      </div>
+    </div>`;
+  }).join('');
+  // Show/hide "Add selected" button
+  const any=Object.values(editBillAddQtys).some(q=>q>0);
+  let applyBtn=document.getElementById('ebApplyBtn');
+  if(!applyBtn){
+    applyBtn=document.createElement('button');
+    applyBtn.id='ebApplyBtn';
+    applyBtn.style.cssText='width:calc(100% - 28px);margin:8px 14px;background:var(--red);border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;display:none';
+    applyBtn.textContent='➕ Add selected to bill';
+    applyBtn.onclick=applyEditBillAdds;
+    el.parentNode.appendChild(applyBtn);
+  }
+  applyBtn.style.display=any?'block':'none';
+}
+
+function ebAddStep(key,delta){
+  const cur=editBillAddQtys[key]||0;
+  editBillAddQtys[key]=Math.max(0,Math.round((cur+delta)*2)/2);
+  renderEditBillAddGrid();
+}
+function ebAddSet(key,val){
+  editBillAddQtys[key]=Math.max(0,Math.round((parseFloat(val)||0)*2)/2);
+  renderEditBillAddGrid();
+}
+function applyEditBillAdds(){
+  Object.entries(editBillAddQtys).forEach(([key,qty])=>{
+    if(!qty)return;
+    const prod=products.find(p=>p.key===key);if(!prod)return;
+    const ex=editingBillItems.find(i=>i.prod.key===key);
+    if(ex) ex.qty=Math.round((ex.qty+qty)*2)/2;
+    else editingBillItems.push({prod,qty});
+  });
+  editBillAddQtys={};
+  renderEditBillItems();
+  renderEditBillAddGrid();
 }
 
 function updEditBillQty(idx,val){
@@ -1605,7 +1663,7 @@ function updEditBillQty(idx,val){
 function rmEditBillItem(idx){
   editingBillItems.splice(idx,1);
   renderEditBillItems();
-  populateEditBillSelect();
+  renderEditBillAddGrid();
 }
 function updEditBillTotal(){
   const grand=editingBillItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
@@ -2210,7 +2268,10 @@ window.saveEditBill=saveEditBill;
 window.updEditBillQty=updEditBillQty;
 window.rmEditBillItem=rmEditBillItem;
 window.applyEditBillAdds=applyEditBillAdds;
-window.populateEditBillSelect=populateEditBillSelect;
+window.ebItemStep=ebItemStep;
+window.ebAddStep=ebAddStep;
+window.ebAddSet=ebAddSet;
+window.toggleEditBillAddSection=toggleEditBillAddSection;
 window.deleteBill=deleteBill;
 window.openBillsDateModal=openBillsDateModal;
 window.closeBillsDateModal=closeBillsDateModal;
