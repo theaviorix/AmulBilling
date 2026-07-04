@@ -1441,6 +1441,9 @@ function renderBills(){
 
   // Group bills by date (date part only, strip time)
   const dateKey=d=>(d||'Unknown date').split(',')[0].trim();
+  // Build a customer-order lookup from the customers array
+  const custOrder=new Map(customers.map((c,i)=>[c.name,i]));
+  const custSortKey=name=>custOrder.has(name)?custOrder.get(name):9999;
   // Sort bills latest first — use original index in bills[] for postBillToLedger(oi)
   const indexed=bills.map((o,oi)=>({o,oi}));
   // Parse "DD Mon YYYY" for sorting
@@ -1456,8 +1459,9 @@ function renderBills(){
     if(!groups.has(dk))groups.set(dk,[]);
     groups.get(dk).push({o,oi});
   });
-  // Sort groups by date descending
+  // Sort groups by date descending; within each group sort by customer order
   const sortedGroups=[...groups.entries()].sort((a,b)=>parseDate(b[0])-parseDate(a[0]));
+  sortedGroups.forEach(([,entries])=>entries.sort((a,b)=>custSortKey(a.o.custName)-custSortKey(b.o.custName)));
 
   let invoicesHtml='<div id="invoicesContainer">';
   sortedGroups.forEach(([dateLabel,entries])=>{
@@ -1931,6 +1935,14 @@ async function downloadAllBillsPDF(scopedBills,rangeLabel){
   const billsToUse=Array.isArray(scopedBills)?scopedBills:bills;
   const label=rangeLabel||'All bills';
   if(!billsToUse.length){showToast('No bills to export.');return;}
+
+  // Sort by customer order defined in customers list
+  const pdfCustOrder=new Map(customers.map((c,i)=>[c.name,i]));
+  const sortedBills=[...billsToUse].sort((a,b)=>{
+    const ai=pdfCustOrder.has(a.custName)?pdfCustOrder.get(a.custName):9999;
+    const bi=pdfCustOrder.has(b.custName)?pdfCustOrder.get(b.custName):9999;
+    return ai-bi;
+  });
   showToast('Building dispatch sheet…');
   let JsPDF;
   try{JsPDF=await loadJsPDF();}
@@ -1940,7 +1952,7 @@ async function downloadAllBillsPDF(scopedBills,rangeLabel){
   //    Append any deleted products still referenced in bills at the end.
   const prodObjMap=new Map();
   products.forEach(p=>prodObjMap.set(p.key,p));
-  billsToUse.forEach(o=>o.items.forEach(item=>{if(!prodObjMap.has(item.prod.key))prodObjMap.set(item.prod.key,item.prod);}));
+  sortedBills.forEach(o=>o.items.forEach(item=>{if(!prodObjMap.has(item.prod.key))prodObjMap.set(item.prod.key,item.prod);}));
   const masterKeys=products.map(p=>p.key);
   const extraKeys=[...prodObjMap.keys()].filter(k=>!masterKeys.includes(k));
   const prods=[...masterKeys,...extraKeys].map(k=>prodObjMap.get(k));
@@ -1949,15 +1961,13 @@ async function downloadAllBillsPDF(scopedBills,rangeLabel){
   const DASH='';
   const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total','Total Dues']];
 
-  const body=billsToUse.map(o=>{
+  const body=sortedBills.map(o=>{
     const qtyMap={};
     o.items.forEach(item=>qtyMap[item.prod.key]=item.qty);
     const grand=calcGrand(o);
 
     const cust=customers.find(c=>c.name===o.custName);
     const liveBal=cust?custBal(cust):0;
-    // If posted: bill is already in the ledger, so liveBal IS the total due (includes this bill)
-    // If not posted: bill not yet in ledger, so total due = existing balance + this bill
     const due=o.posted ? liveBal : liveBal+grand;
 
     let dueStr='';
@@ -1977,13 +1987,13 @@ async function downloadAllBillsPDF(scopedBills,rangeLabel){
 
   // ── Totals footer — dues cell intentionally left blank
   const footerQtys=prods.map(p=>{
-    const t=billsToUse.reduce((s,o)=>{
+    const t=sortedBills.reduce((s,o)=>{
       const item=o.items.find(i=>i.prod.key===p.key);
       return s+(item?item.qty:0);
     },0);
     return t>0?fmtQty(t):DASH;
   });
-  const grandTotal=billsToUse.reduce((s,o)=>s+calcGrand(o),0);
+  const grandTotal=sortedBills.reduce((s,o)=>s+calcGrand(o),0);
   const foot=[['TOTAL',...footerQtys,'Rs.'+grandTotal.toFixed(0),'']];
 
   const doc=new JsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -1997,7 +2007,7 @@ async function downloadAllBillsPDF(scopedBills,rangeLabel){
   doc.setFontSize(10);doc.setFont('helvetica','bold');
   doc.text('Amul Billing — Daily Dispatch Sheet',44,6.5);
   doc.setFontSize(8);doc.setFont('helvetica','normal');
-  doc.text('Period: '+label+'   Bills: '+billsToUse.length+'   Products: '+prods.length,44,12);
+  doc.text('Period: '+label+'   Bills: '+sortedBills.length+'   Products: '+prods.length,44,12);
   doc.setTextColor(30,30,30);
 
   // dynamic column widths
