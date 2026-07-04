@@ -676,10 +676,20 @@ details[open] .sum-chev{transform:rotate(180deg)}
 
 <!-- EDIT BILL MODAL -->
 <div class="modal-overlay" id="editBillModal" onclick="if(event.target===this)closeEditBillModal()">
-  <div class="modal-sheet" style="max-height:82vh;overflow-y:auto">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-title">✏️ Edit Bill <span id="editBillCustName" style="font-weight:600;color:var(--text3)"></span></div>
+
+    <!-- Existing items -->
+    <div class="field-label">Items in bill</div>
     <div id="editBillItemsList"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1.5px solid var(--border);margin-top:8px;margin-bottom:14px">
+
+    <!-- Add new products -->
+    <div class="field-label" style="margin-top:12px">Add more products</div>
+    <div id="editBillAddGrid" style="margin-bottom:8px"></div>
+    <button onclick="applyEditBillAdds()" id="editBillAddBtn" style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px;font-size:13px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;margin-bottom:12px;display:none">➕ Add selected to bill</button>
+
+    <!-- Total -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1.5px solid var(--border);margin-top:4px;margin-bottom:14px">
       <span style="font-size:13px;font-weight:700;color:var(--text2)">New grand total</span>
       <span id="editBillGrandTotal" style="font-size:17px;font-weight:800;color:var(--red)">₹0.00</span>
     </div>
@@ -1519,23 +1529,27 @@ async function deleteBill(oi){
 // ── EDIT BILL ────────────────────────────────────────────────────────────────
 let editingBillIdx=-1;
 let editingBillItems=[]; // working copy of {prod,qty}
+let editBillAddQtys={};  // key→qty for new products being added
 
 function openEditBillModal(oi){
   const o=bills[oi];if(!o)return;
   editingBillIdx=oi;
   editingBillItems=o.items.map(i=>({prod:i.prod,qty:i.qty}));
+  editBillAddQtys={};
   document.getElementById('editBillCustName').textContent='— '+o.custName;
   renderEditBillItems();
+  renderEditBillAddGrid();
   document.getElementById('editBillModal').classList.add('open');
 }
 function closeEditBillModal(){
   document.getElementById('editBillModal').classList.remove('open');
-  editingBillIdx=-1;editingBillItems=[];
+  editingBillIdx=-1;editingBillItems=[];editBillAddQtys={};
 }
+
 function renderEditBillItems(){
   const el=document.getElementById('editBillItemsList');
   if(!editingBillItems.length){
-    el.innerHTML='<div class="edit-item-empty">No items left. Add at least one product or cancel.</div>';
+    el.innerHTML='<div class="edit-item-empty">No items. Add products below or cancel.</div>';
   } else {
     el.innerHTML=editingBillItems.map((it,idx)=>{
       const price=parseFloat(it.prod.price)||0;
@@ -1551,14 +1565,83 @@ function renderEditBillItems(){
   }
   updEditBillTotal();
 }
+
+function renderEditBillAddGrid(){
+  // Show only products NOT already in the bill
+  const existingKeys=new Set(editingBillItems.map(i=>i.prod.key));
+  const addable=products.filter(p=>!existingKeys.has(p.key));
+  const gridEl=document.getElementById('editBillAddGrid');
+  const btnEl=document.getElementById('editBillAddBtn');
+  if(!addable.length){
+    gridEl.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px 0">All products already in bill.</div>';
+    if(btnEl)btnEl.style.display='none';
+    return;
+  }
+  gridEl.innerHTML=addable.map(p=>{
+    const qty=editBillAddQtys[p.key]||0;
+    const price=parseFloat(p.price)||0;
+    return `<div class="pqg-row">
+      <div class="pqg-info">
+        <div class="pqg-name">${p.name}</div>
+        <div class="pqg-sub">${p.unit}${price?' · '+fmt(price):''}</div>
+      </div>
+      <div class="pqg-stepper${qty?' active':''}">
+        <button class="pqg-btn" onmousedown="event.preventDefault()" onclick="ebAddStep('${p.key}',-0.5)">−</button>
+        <input class="pqg-qty${qty?' nonzero':''}" type="number" min="0" step="0.5" inputmode="decimal" value="${qty||''}" placeholder="0" onchange="ebAddSet('${p.key}',this.value)" oninput="ebAddSet('${p.key}',this.value)">
+        <button class="pqg-btn" onmousedown="event.preventDefault()" onclick="ebAddStep('${p.key}',0.5)">+</button>
+      </div>
+    </div>`;
+  }).join('');
+  updateEditBillAddBtn();
+}
+
+function ebAddStep(key,delta){
+  const cur=editBillAddQtys[key]||0;
+  editBillAddQtys[key]=Math.max(0,Math.round((cur+delta)*2)/2);
+  // Update just this row
+  const existingKeys=new Set(editingBillItems.map(i=>i.prod.key));
+  const addable=products.filter(p=>!existingKeys.has(p.key));
+  const idx=addable.findIndex(p=>p.key===key);
+  const rows=document.querySelectorAll('#editBillAddGrid .pqg-row');
+  if(rows[idx]){
+    const qty=editBillAddQtys[key];
+    rows[idx].querySelector('.pqg-stepper').className='pqg-stepper'+(qty?' active':'');
+    const inp=rows[idx].querySelector('.pqg-qty');
+    inp.value=qty||'';inp.className='pqg-qty'+(qty?' nonzero':'');
+  }
+  updateEditBillAddBtn();
+}
+function ebAddSet(key,val){
+  editBillAddQtys[key]=Math.max(0,Math.round((parseFloat(val)||0)*2)/2);
+  updateEditBillAddBtn();
+}
+function updateEditBillAddBtn(){
+  const any=Object.values(editBillAddQtys).some(q=>q>0);
+  const btn=document.getElementById('editBillAddBtn');
+  if(btn) btn.style.display=any?'block':'none';
+}
+function applyEditBillAdds(){
+  Object.entries(editBillAddQtys).forEach(([key,qty])=>{
+    if(!qty)return;
+    const prod=products.find(p=>p.key===key);if(!prod)return;
+    const ex=editingBillItems.find(i=>i.prod.key===key);
+    if(ex) ex.qty=Math.round((ex.qty+qty)*2)/2;
+    else editingBillItems.push({prod,qty});
+  });
+  editBillAddQtys={};
+  renderEditBillItems();
+  renderEditBillAddGrid();
+}
+
 function updEditBillQty(idx,val){
   const q=Math.max(0.5,parseFloat(val)||0.5);
-  editingBillItems[idx].qty=Math.round(q*2)/2; // snap to nearest 0.5, matches rest of app
+  editingBillItems[idx].qty=Math.round(q*2)/2;
   updEditBillTotal();
 }
 function rmEditBillItem(idx){
   editingBillItems.splice(idx,1);
   renderEditBillItems();
+  renderEditBillAddGrid(); // refresh addable grid since a product was freed
 }
 function updEditBillTotal(){
   const grand=editingBillItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
@@ -1568,33 +1651,47 @@ function updEditBillTotal(){
 function saveEditBill(){
   if(editingBillIdx<0)return;
   const o=bills[editingBillIdx];if(!o)return;
-  if(!editingBillItems.length){showToast('A bill needs at least one item. Delete the bill instead if needed.');return;}
+  if(!editingBillItems.length){showToast('A bill needs at least one item.');return;}
+
+  // Apply any pending add-grid selections before saving
+  const pendingAdds=Object.values(editBillAddQtys).some(q=>q>0);
+  if(pendingAdds) applyEditBillAdds();
 
   const oldGrand=calcGrand(o);
+  const oldItems=o.items.map(i=>({...i})); // snapshot for manifest diff
   o.items=editingBillItems.map(i=>({prod:i.prod,qty:i.qty}));
   const newGrand=calcGrand(o);
 
-  // If this bill was already posted to the customer's Khatabook ledger,
-  // keep that ledger entry mathematically in sync with the edited bill.
+  // ── Manifest: only update if this bill is within the current manifest window
+  // (i.e. its original index in bills[] >= manifestBaseline is already in window)
+  // The manifest recomputes from bills[] automatically in renderBills(),
+  // so no manual patch needed — renderBills() will recalculate from scratch.
+
+  // ── Khatabook sync: update the linked ledger entry amount + items + note
   if(o.posted){
     const cust=customers.find(c=>c.name===o.custName);
     if(cust){
       let entry=o.billId?cust.ledger.find(t=>t.billId===o.billId):null;
-      // Fallback for bills posted before billId tracking existed: match by note+old amount, only once
       if(!entry){
         entry=cust.ledger.find(t=>t.note==='Bill post'&&Math.abs((t.dr||0)-oldGrand)<0.005&&!t._editedMatch);
-        if(entry){entry._editedMatch=true;if(!o.billId)o.billId='b'+Date.now()+Math.random().toString(36).slice(2,7);entry.billId=o.billId;}
+        if(entry){
+          entry._editedMatch=true;
+          if(!o.billId) o.billId='b'+Date.now()+Math.random().toString(36).slice(2,7);
+          entry.billId=o.billId;
+        }
       }
       if(entry){
-        entry.dr=newGrand;
-        entry.items=o.items.map(i=>({sid:i.prod.sid,qty:i.qty}));
+        entry.dr=Math.round(newGrand*100)/100;
+        entry.items=o.items.map(i=>({sid:i.prod.sid||i.prod.key,qty:i.qty}));
+        // Update note to reflect edited bill
+        entry.note='Bill post (edited)';
       }
     }
   }
 
   closeEditBillModal();
   renderCustomers();renderBills();saveState();
-  showToast('Bill updated. Total: '+fmt(newGrand)+(o.posted?' (Khatabook synced)':''));
+  showToast('Bill updated — '+fmt(newGrand)+(o.posted?' · Khatabook synced':''));
 }
 
 function filterBills(q){
@@ -2148,6 +2245,9 @@ window.closeEditBillModal=closeEditBillModal;
 window.saveEditBill=saveEditBill;
 window.updEditBillQty=updEditBillQty;
 window.rmEditBillItem=rmEditBillItem;
+window.applyEditBillAdds=applyEditBillAdds;
+window.ebAddStep=ebAddStep;
+window.ebAddSet=ebAddSet;
 window.deleteBill=deleteBill;
 window.openBillsDateModal=openBillsDateModal;
 window.closeBillsDateModal=closeBillsDateModal;
