@@ -1441,9 +1441,9 @@ function renderBills(){
 
   // Group bills by date (date part only, strip time)
   const dateKey=d=>(d||'Unknown date').split(',')[0].trim();
-  // Build a customer-order lookup from the customers array
-  const custOrder=new Map(customers.map((c,i)=>[c.name,i]));
-  const custSortKey=name=>custOrder.has(name)?custOrder.get(name):9999;
+  // Build a customer-order lookup from the customers array (case-insensitive)
+  const custOrder=new Map(customers.map((c,i)=>[c.name.trim().toLowerCase(),i]));
+  const custSortKey=name=>custOrder.has(name.trim().toLowerCase())?custOrder.get(name.trim().toLowerCase()):9999;
   // Sort bills latest first — use original index in bills[] for postBillToLedger(oi)
   const indexed=bills.map((o,oi)=>({o,oi}));
   // Parse "DD Mon YYYY" for sorting
@@ -1936,13 +1936,15 @@ async function downloadAllBillsPDF(scopedBills,rangeLabel){
   const label=rangeLabel||'All bills';
   if(!billsToUse.length){showToast('No bills to export.');return;}
 
-  // Sort by customer order defined in customers list
-  const pdfCustOrder=new Map(customers.map((c,i)=>[c.name,i]));
+  // Sort by customer order defined in customers list (case-insensitive match)
+  const pdfCustOrder=new Map(customers.map((c,i)=>[c.name.trim().toLowerCase(),i]));
   const sortedBills=[...billsToUse].sort((a,b)=>{
-    const ai=pdfCustOrder.has(a.custName)?pdfCustOrder.get(a.custName):9999;
-    const bi=pdfCustOrder.has(b.custName)?pdfCustOrder.get(b.custName):9999;
+    const ai=pdfCustOrder.has(a.custName.trim().toLowerCase())?pdfCustOrder.get(a.custName.trim().toLowerCase()):9999;
+    const bi=pdfCustOrder.has(b.custName.trim().toLowerCase())?pdfCustOrder.get(b.custName.trim().toLowerCase()):9999;
     return ai-bi;
   });
+  console.log('PDF customer order:',customers.map(c=>c.name));
+  console.log('PDF sorted bills order:',sortedBills.map(b=>b.custName));
   showToast('Building dispatch sheet…');
   let JsPDF;
   try{JsPDF=await loadJsPDF();}
