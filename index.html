@@ -76,7 +76,10 @@ body{display:flex;flex-direction:column;max-width:560px;margin:0 auto;min-height
 .blue-badge{background:#f2f2f0;color:#0f0f10;border:1px solid #c9c9c5}
 .green-badge{background:var(--green-l);color:var(--green)}
 
-.cust-row{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;min-width:0}
+.cust-row{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);transition:background .12s;min-width:0}
+.cust-reorder{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+.cust-reorder button{background:none;border:none;padding:1px 4px;font-size:13px;line-height:1;cursor:pointer;color:var(--text3);-webkit-tap-highlight-color:transparent;border-radius:4px}
+.cust-reorder button:active{background:var(--border)}
 .cust-row:last-child{border-bottom:none}
 .cust-row:active{background:var(--bg)}
 .cust-avatar{width:36px;height:36px;border-radius:50%;background:#f2f2f0;color:#0f0f10;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
@@ -407,10 +410,10 @@ details[open] .sum-chev{transform:rotate(180deg)}
         <div style="padding:10px 14px 0;display:flex;flex-direction:column;gap:8px">
           <div class="search-bar" style="margin:0"><span>🔍</span><input type="text" id="custSearch" placeholder="Search customers…" oninput="filterCustomers(this.value)"></div>
           <div style="display:flex;gap:8px;align-items:center">
-            <select id="bookedFilter" onchange="filterCustomers(document.getElementById('custSearch').value)" style="flex:1;appearance:none;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;font-weight:700;color:var(--text);font-family:inherit;outline:none;cursor:pointer;min-width:0">
-              <option value="all">📋 Show all</option>
-              <option value="booked">✓ Booked only</option>
-              <option value="unbooked">○ Unbooked only</option>
+            <select id="bookedFilter" onchange="filterCustomers(document.getElementById('custSearch').value)" style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;font-weight:700;color:var(--text);font-family:inherit;outline:none;cursor:pointer;min-width:0;-webkit-appearance:auto;appearance:auto">
+              <option value="all">Show all</option>
+              <option value="booked">Booked only ✓</option>
+              <option value="unbooked">Unbooked only</option>
             </select>
             <button onclick="resetAllBooked()" style="flex-shrink:0;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--text2);font-weight:700;white-space:nowrap;min-height:44px">✕ Reset</button>
           </div>
@@ -838,6 +841,10 @@ function renderCustomers(){
     else if(bal<0){chipClass='chip-adv';chipTxt='Advance '+fmt(-bal);}
     const isBooked=!!c.booked;
     return `<div class="cust-row" data-name="${c.name.toLowerCase()}" data-booked="${isBooked?'1':'0'}">
+      <div class="cust-reorder">
+        <button onclick="event.stopPropagation();moveCust(${i},-1)" ${i===0?'style="visibility:hidden"':''}>▲</button>
+        <button onclick="event.stopPropagation();moveCust(${i},1)" ${i===customers.length-1?'style="visibility:hidden"':''}>▼</button>
+      </div>
       <button class="booked-toggle${isBooked?' booked':''}" onclick="event.stopPropagation();toggleBooked(${i})" title="${isBooked?'Booked':'Not booked'}">${isBooked?'✓':'○'}</button>
       <div class="cust-avatar" onclick="openLedger(${i})">${ini(c.name)}</div>
       <div class="cust-info" onclick="openLedger(${i})">
@@ -868,6 +875,13 @@ async function resetAllBooked(){
   customers.forEach(c=>c.booked=false);
   renderCustomers();saveState();
   showToast('All customers reset to unbooked.');
+}
+
+function moveCust(i,dir){
+  const j=i+dir;
+  if(j<0||j>=customers.length)return;
+  [customers[i],customers[j]]=[customers[j],customers[i]];
+  renderCustomers();saveState();
 }
 
 function quickAddCust(){
@@ -1933,7 +1947,7 @@ async function downloadAllBillsPDF(scopedBills,rangeLabel){
 
   // ── Build table rows
   const DASH='';
-  const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total','Dues']];
+  const head=[['Customer',...prods.map(p=>p.sid||p.name),'Total','Total Dues']];
 
   const body=billsToUse.map(o=>{
     const qtyMap={};
@@ -1941,12 +1955,14 @@ async function downloadAllBillsPDF(scopedBills,rangeLabel){
     const grand=calcGrand(o);
 
     const cust=customers.find(c=>c.name===o.custName);
-    const fullBal=cust?custBal(cust):0;
-    const due=o.posted?fullBal-grand:fullBal;
+    const liveBal=cust?custBal(cust):0;
+    // If posted: bill is already in the ledger, so liveBal IS the total due (includes this bill)
+    // If not posted: bill not yet in ledger, so total due = existing balance + this bill
+    const due=o.posted ? liveBal : liveBal+grand;
 
     let dueStr='';
-    if(due>0)       dueStr='Rs.'+due.toFixed(0);
-    else if(due<0)  dueStr='Adv Rs.'+Math.abs(due).toFixed(0);
+    if(due>0.005)       dueStr='Rs.'+Math.round(due);
+    else if(due<-0.005) dueStr='Adv Rs.'+Math.round(-due);
 
     return [
       o.custName,
@@ -2084,6 +2100,7 @@ renderCustomers();renderPrices();populateSelects();renderActiveOrders();renderPr
 window.mgo=mgo;
 window.downloadManifestPDF=downloadManifestPDF;
 window.clearManifest=clearManifest;
+window.moveCust=moveCust;
 window.toggleBooked=toggleBooked;
 window.resetAllBooked=resetAllBooked;
 window.filterCustomers=filterCustomers;
