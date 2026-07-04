@@ -684,9 +684,14 @@ details[open] .sum-chev{transform:rotate(180deg)}
     <div id="editBillItemsList"></div>
 
     <!-- Add new products -->
-    <div class="field-label" style="margin-top:12px">Add more products</div>
-    <div id="editBillAddGrid" style="margin-bottom:8px"></div>
-    <button onclick="applyEditBillAdds()" id="editBillAddBtn" style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px;font-size:13px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;margin-bottom:12px;display:none">➕ Add selected to bill</button>
+    <div class="field-label" style="margin-top:12px">Add product to bill</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+      <select id="editBillAddSelect" style="flex:1;min-width:0;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px 10px;font-size:13px;font-weight:600;color:var(--text);font-family:inherit;outline:none;-webkit-appearance:auto;appearance:auto">
+        <option value="">— pick product —</option>
+      </select>
+      <input id="editBillAddQty" type="number" min="0.5" step="0.5" inputmode="decimal" value="1" style="width:58px;flex-shrink:0;border:1.5px solid var(--border);border-radius:10px;padding:9px 6px;font-size:13px;font-family:inherit;text-align:center;outline:none;background:var(--bg);color:var(--text)">
+      <button onclick="applyEditBillAdds()" style="flex-shrink:0;background:var(--red);border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap">➕ Add</button>
+    </div>
 
     <!-- Total -->
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1.5px solid var(--border);margin-top:4px;margin-bottom:14px">
@@ -1538,8 +1543,34 @@ function openEditBillModal(oi){
   editBillAddQtys={};
   document.getElementById('editBillCustName').textContent='— '+o.custName;
   renderEditBillItems();
-  renderEditBillAddGrid();
+  populateEditBillSelect();
+  document.getElementById('editBillAddQty').value=1;
   document.getElementById('editBillModal').classList.add('open');
+}
+
+function populateEditBillSelect(){
+  const sel=document.getElementById('editBillAddSelect');
+  if(!sel)return;
+  const existingKeys=new Set(editingBillItems.map(i=>i.prod.key));
+  const addable=products.filter(p=>!existingKeys.has(p.key));
+  sel.innerHTML='<option value="">— pick product —</option>'+
+    addable.map(p=>`<option value="${p.key}">${p.name} (${p.unit})${p.price?' · ₹'+p.price:''}</option>`).join('');
+}
+
+function applyEditBillAdds(){
+  const sel=document.getElementById('editBillAddSelect');
+  const key=sel?sel.value:'';
+  if(!key){showToast('Pick a product first.');return;}
+  const qty=Math.max(0.5,Math.round((parseFloat(document.getElementById('editBillAddQty').value)||1)*2)/2);
+  const prod=products.find(p=>p.key===key);if(!prod)return;
+  const ex=editingBillItems.find(i=>i.prod.key===key);
+  if(ex) ex.qty=Math.round((ex.qty+qty)*2)/2;
+  else editingBillItems.push({prod,qty});
+  // Reset
+  document.getElementById('editBillAddQty').value=1;
+  renderEditBillItems();
+  populateEditBillSelect(); // refresh — added product disappears from dropdown
+  sel.value='';
 }
 function closeEditBillModal(){
   document.getElementById('editBillModal').classList.remove('open');
@@ -1566,62 +1597,6 @@ function renderEditBillItems(){
   updEditBillTotal();
 }
 
-function renderEditBillAddGrid(){
-  // Show only products NOT already in the bill
-  const existingKeys=new Set(editingBillItems.map(i=>i.prod.key));
-  const addable=products.filter(p=>!existingKeys.has(p.key));
-  const gridEl=document.getElementById('editBillAddGrid');
-  const btnEl=document.getElementById('editBillAddBtn');
-  if(!addable.length){
-    gridEl.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px 0">All products already in bill.</div>';
-    if(btnEl)btnEl.style.display='none';
-    return;
-  }
-  gridEl.innerHTML=addable.map(p=>{
-    const qty=editBillAddQtys[p.key]||0;
-    const price=parseFloat(p.price)||0;
-    return `<div class="pqg-row">
-      <div class="pqg-info">
-        <div class="pqg-name">${p.name}</div>
-        <div class="pqg-sub">${p.unit}${price?' · '+fmt(price):''}</div>
-      </div>
-      <div class="pqg-stepper${qty?' active':''}">
-        <button class="pqg-btn" onmousedown="event.preventDefault()" onclick="ebAddStep('${p.key}',-0.5)">−</button>
-        <input class="pqg-qty${qty?' nonzero':''}" type="number" min="0" step="0.5" inputmode="decimal" value="${qty||''}" placeholder="0" onchange="ebAddSet('${p.key}',this.value)" oninput="ebAddSet('${p.key}',this.value)">
-        <button class="pqg-btn" onmousedown="event.preventDefault()" onclick="ebAddStep('${p.key}',0.5)">+</button>
-      </div>
-    </div>`;
-  }).join('');
-  updateEditBillAddBtn();
-}
-
-function ebAddStep(key,delta){
-  const cur=editBillAddQtys[key]||0;
-  editBillAddQtys[key]=Math.max(0,Math.round((cur+delta)*2)/2);
-  renderEditBillAddGrid();
-}
-function ebAddSet(key,val){
-  editBillAddQtys[key]=Math.max(0,Math.round((parseFloat(val)||0)*2)/2);
-  updateEditBillAddBtn();
-}
-function updateEditBillAddBtn(){
-  const any=Object.values(editBillAddQtys).some(q=>q>0);
-  const btn=document.getElementById('editBillAddBtn');
-  if(btn) btn.style.display=any?'block':'none';
-}
-function applyEditBillAdds(){
-  Object.entries(editBillAddQtys).forEach(([key,qty])=>{
-    if(!qty)return;
-    const prod=products.find(p=>p.key===key);if(!prod)return;
-    const ex=editingBillItems.find(i=>i.prod.key===key);
-    if(ex) ex.qty=Math.round((ex.qty+qty)*2)/2;
-    else editingBillItems.push({prod,qty});
-  });
-  editBillAddQtys={};
-  renderEditBillItems();
-  renderEditBillAddGrid();
-}
-
 function updEditBillQty(idx,val){
   const q=Math.max(0.5,parseFloat(val)||0.5);
   editingBillItems[idx].qty=Math.round(q*2)/2;
@@ -1630,7 +1605,7 @@ function updEditBillQty(idx,val){
 function rmEditBillItem(idx){
   editingBillItems.splice(idx,1);
   renderEditBillItems();
-  renderEditBillAddGrid(); // refresh addable grid since a product was freed
+  populateEditBillSelect();
 }
 function updEditBillTotal(){
   const grand=editingBillItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
@@ -2235,8 +2210,7 @@ window.saveEditBill=saveEditBill;
 window.updEditBillQty=updEditBillQty;
 window.rmEditBillItem=rmEditBillItem;
 window.applyEditBillAdds=applyEditBillAdds;
-window.ebAddStep=ebAddStep;
-window.ebAddSet=ebAddSet;
+window.populateEditBillSelect=populateEditBillSelect;
 window.deleteBill=deleteBill;
 window.openBillsDateModal=openBillsDateModal;
 window.closeBillsDateModal=closeBillsDateModal;
