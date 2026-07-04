@@ -676,7 +676,7 @@ details[open] .sum-chev{transform:rotate(180deg)}
 
 <!-- EDIT BILL MODAL -->
 <div class="modal-overlay" id="editBillModal" onclick="if(event.target===this)closeEditBillModal()">
-  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto" onclick="event.stopPropagation()">
     <div class="modal-title">✏️ Edit Bill <span id="editBillCustName" style="font-weight:600;color:var(--text3)"></span></div>
 
     <!-- Existing items -->
@@ -1598,18 +1598,7 @@ function renderEditBillAddGrid(){
 function ebAddStep(key,delta){
   const cur=editBillAddQtys[key]||0;
   editBillAddQtys[key]=Math.max(0,Math.round((cur+delta)*2)/2);
-  // Update just this row
-  const existingKeys=new Set(editingBillItems.map(i=>i.prod.key));
-  const addable=products.filter(p=>!existingKeys.has(p.key));
-  const idx=addable.findIndex(p=>p.key===key);
-  const rows=document.querySelectorAll('#editBillAddGrid .pqg-row');
-  if(rows[idx]){
-    const qty=editBillAddQtys[key];
-    rows[idx].querySelector('.pqg-stepper').className='pqg-stepper'+(qty?' active':'');
-    const inp=rows[idx].querySelector('.pqg-qty');
-    inp.value=qty||'';inp.className='pqg-qty'+(qty?' nonzero':'');
-  }
-  updateEditBillAddBtn();
+  renderEditBillAddGrid();
 }
 function ebAddSet(key,val){
   editBillAddQtys[key]=Math.max(0,Math.round((parseFloat(val)||0)*2)/2);
