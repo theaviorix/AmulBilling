@@ -1203,7 +1203,7 @@ function populateSelects(){
 }
 
 function custOptionHtml(list){
-  if(!list.length) return '<div class="combo-empty">No customers found</div>';
+  if(!list.length) return '<div class="combo-empty">All customers booked ✓</div>';
   return list.map(c=>`<div class="combo-opt" onmousedown="event.preventDefault()" onclick="selectCustomer('${c.name.replace(/'/g,"\\'")}')">
       <div>${c.name}</div>${c.phone?`<div class="combo-opt-sub">${c.phone}</div>`:''}
     </div>`).join('');
@@ -1216,14 +1216,15 @@ function setComboCardOverflow(wrapEl,open){
 
 function filterCustDropdown(q){
   const lq=q.toLowerCase();
-  const list=customers.filter(c=>c.name.toLowerCase().includes(lq)||(c.phone||'').includes(lq));
+  const list=customers.filter(c=>!c.booked&&(c.name.toLowerCase().includes(lq)||(c.phone||'').includes(lq)));
   document.getElementById('custComboList').innerHTML=custOptionHtml(list);
   const w=document.getElementById('custComboWrap');
   w.classList.add('open');setComboCardOverflow(w,true);
   if(!q) selectedCustName='';
 }
 function openCustDropdown(){
-  document.getElementById('custComboList').innerHTML=custOptionHtml(customers);
+  const list=customers.filter(c=>!c.booked);
+  document.getElementById('custComboList').innerHTML=custOptionHtml(list);
   const w=document.getElementById('custComboWrap');
   w.classList.add('open');setComboCardOverflow(w,true);
 }
@@ -1343,9 +1344,12 @@ function commitOrder(){
   let o=orders.find(x=>x.custName===cn);
   if(o){items.forEach(bi=>{const ex=o.items.find(i=>i.prod.key===bi.prod.key);if(ex)ex.qty+=bi.qty;else o.items.push({...bi});});}
   else orders.push({custName:cn,items,posted:false,date:today()});
-  prodQtys={};renderProdQtyGrid();renderActiveOrders();saveState();
+  // Auto-mark customer as booked
+  const cust=customers.find(c=>c.name===cn);
+  if(cust) cust.booked=true;
+  prodQtys={};renderProdQtyGrid();renderActiveOrders();renderCustomers();saveState();
   selectedCustName='';document.getElementById('custOrderSearch').value='';
-  showToast('Order added for '+cn+'.');
+  showToast('Order added for '+cn+' ✓ Marked as booked.');
 }
 function renderActiveOrders(){
   const card=document.getElementById('activeOrdersCard');
