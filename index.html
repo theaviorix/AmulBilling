@@ -262,6 +262,8 @@ details[open] .sum-chev{transform:rotate(180deg)}
 .kb-gave-btn:active{background:var(--red-d);transform:scale(.97)}
 .kb-got-btn{background:var(--green);color:#fff;border:none;border-radius:14px;padding:15px 10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s,transform .1s}
 .kb-got-btn:active{background:var(--green-d);transform:scale(.97)}
+.kb-wa-btn{background:#25D366;color:#fff;border:none;border-radius:14px;padding:13px 10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s,transform .1s;margin:0 16px 14px}
+.kb-wa-btn:active{background:#1ebe5a;transform:scale(.97)}
 
 /* Transaction History */
 .kb-txn-section{flex:1;overflow-y:auto;padding:0 16px;padding-bottom:calc(20px + var(--safe-b))}
@@ -395,6 +397,7 @@ details[open] .sum-chev{transform:rotate(180deg)}
     <button class="mnb" onclick="mgo('prices')" id="mnb-prices"><div class="mnb-icon">🏷️</div>Prices</button>
     <button class="mnb" onclick="mgo('orders')" id="mnb-orders"><div class="mnb-icon">🛒</div>Orders</button>
     <button class="mnb" onclick="mgo('bills')" id="mnb-bills"><div class="mnb-icon">📄</div>Bills</button>
+    <button class="mnb" onclick="mgo('crates')" id="mnb-crates"><div class="mnb-icon">📦</div>Crates</button>
   </nav>
 
   <div class="main-content">
@@ -470,6 +473,13 @@ details[open] .sum-chev{transform:rotate(180deg)}
               <span id="builderTotal" style="font-size:16px;font-weight:800;color:var(--red)">₹0.00</span>
             </div>
           </div>
+          <div style="margin-bottom:10px">
+            <div class="field-label" style="margin-bottom:6px">Discount (optional)</div>
+            <div style="display:flex;gap:8px">
+              <div class="price-field" style="width:auto;flex:1"><span>₹</span><input type="number" min="0" step="0.5" inputmode="decimal" id="builderDiscountAmt" placeholder="0" oninput="updateBuilderSummary()"></div>
+              <input class="add-input" style="flex:2" id="builderDiscountDesc" placeholder="Reason (optional)">
+            </div>
+          </div>
           <button class="btn-red" onclick="commitOrder()">Add to orders</button>
         </div>
       </div>
@@ -491,6 +501,45 @@ details[open] .sum-chev{transform:rotate(180deg)}
     <div class="mtab" id="mtab-bills">
       <div id="billsOutput">
         <div class="empty"><span class="empty-icon">📄</span><div class="empty-title">No bills yet</div><div class="empty-sub">Enter orders then tap Confirm order.</div></div>
+      </div>
+    </div>
+
+    <!-- CRATES TAB -->
+    <div class="mtab" id="mtab-crates">
+      <div class="card">
+        <div class="card-hdr">
+          <div class="chdr-icon" style="background:var(--green-l)">📦</div>
+          <div class="chdr-title">Log Crates Delivered</div>
+        </div>
+        <div style="padding:12px 14px">
+          <div class="field-label" style="margin-bottom:6px">Customer</div>
+          <div class="select-wrap">
+            <select class="styled-select" id="crateCustSelect"><option value="">Select customer…</option></select>
+            <span class="sel-arrow">▼</span>
+          </div>
+          <div class="field-label" style="margin-bottom:6px">Crates given</div>
+          <input class="add-input" style="margin-bottom:10px;width:100%" type="number" min="1" step="1" inputmode="numeric" id="crateGivenInput" placeholder="e.g. 5">
+          <input class="add-input" style="margin-bottom:10px;width:100%" type="text" id="crateGivenNote" placeholder="Note (optional)">
+          <button class="btn-red" onclick="logCrateGiven()">➕ Log delivery</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div class="chdr-icon" style="background:var(--gold-l)">⏳</div>
+          <div class="chdr-title">Pending Returns</div>
+          <span class="chdr-badge red-badge" id="pendingCrateCount">0</span>
+        </div>
+        <div id="pendingCratesList"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div class="chdr-icon" style="background:var(--blue-l)">📊</div>
+          <div class="chdr-title">Crate Balances</div>
+          <span class="chdr-badge red-badge" style="cursor:pointer" onclick="clearAllCrateBalances()">Clear all</span>
+        </div>
+        <div id="crateBalanceList"></div>
       </div>
     </div>
 
@@ -528,6 +577,20 @@ details[open] .sum-chev{transform:rotate(180deg)}
     <div class="kb-actions">
       <button class="kb-gave-btn" onclick="openGavePanel()">↑ You Gave</button>
       <button class="kb-got-btn" onclick="openGotPanel()">↓ You Got</button>
+    </div>
+    <button class="kb-wa-btn" onclick="sendWhatsAppSummary()">📲 Send Today's Order + Due on WhatsApp</button>
+
+    <!-- CUSTOM PRICES FOR THIS CUSTOMER -->
+    <div style="padding:0 16px 14px">
+      <div class="card">
+        <div class="card-hdr" style="cursor:pointer" onclick="toggleCustPrices()">
+          <div class="chdr-icon" style="background:var(--red-l)">🏷️</div>
+          <div class="chdr-title">Custom Prices</div>
+          <span class="chdr-badge blue-badge" id="kb-custprice-count">0 custom</span>
+          <span id="kb-custprice-chevron" style="margin-left:6px;font-size:11px;color:var(--muted,#888);transition:transform .15s">▶</span>
+        </div>
+        <div id="kb-custprice-list" style="display:none"></div>
+      </div>
     </div>
 
     <!-- TRANSACTIONS -->
@@ -603,8 +666,11 @@ details[open] .sum-chev{transform:rotate(180deg)}
     <div class="modal-title">✏️ Edit Customer</div>
     <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Shop Name</label>
     <input class="m-input" id="editCustNameInput" placeholder="Shop name" type="text">
-    <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Phone Number</label>
-    <input class="m-input" id="editCustPhoneInput" placeholder="e.g. 98765 43210" type="tel" inputmode="tel">
+    <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">WhatsApp Number</label>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:0">
+      <span style="opacity:.45;font-size:14px;font-weight:600;padding:0 2px;white-space:nowrap">+91</span>
+      <input class="m-input" id="editCustPhoneInput" style="margin-bottom:0" placeholder="e.g. 98765 43210" type="tel" inputmode="numeric" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
+    </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeEditCustModal()">Cancel</button>
       <button class="btn-save-green" onclick="saveEditCust()">Save</button>
@@ -691,6 +757,15 @@ details[open] .sum-chev{transform:rotate(180deg)}
       <div id="editBillAddGrid"></div>
     </div>
 
+    <!-- Discount -->
+    <div style="margin-top:10px">
+      <div class="field-label" style="margin-bottom:6px">Discount (optional)</div>
+      <div style="display:flex;gap:8px">
+        <div class="price-field" style="width:auto;flex:1"><span>₹</span><input type="number" min="0" step="0.5" inputmode="decimal" id="editBillDiscountAmt" placeholder="0" oninput="updEditBillTotal()"></div>
+        <input class="add-input" style="flex:2" id="editBillDiscountDesc" placeholder="Reason (optional)">
+      </div>
+    </div>
+
     <!-- Total -->
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1.5px solid var(--border);margin-top:10px;margin-bottom:14px">
       <span style="font-size:13px;font-weight:700;color:var(--text2)">New grand total</span>
@@ -752,7 +827,25 @@ window._applyAppState = function() {
 const ini=n=>n.split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);
 const fmt=n=>'₹'+parseFloat(n).toFixed(2);
 const today=()=>{const d=new Date();return `${String(d.getDate()).padStart(2,'0')} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${d.getFullYear()}, ${d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}`;};
+// Parse the app's stored date format "DD Mon YYYY, HH:MM AM/PM" as a local Date (midnight, day-only)
+const parseAppDate=s=>{
+  if(!s)return null;
+  const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  const m=s.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
+  return m?new Date(+m[3],months[m[2]]!==undefined?months[m[2]]:0,+m[1],0,0,0,0):null;
+};
+const isSameDay=(a,b)=>a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
 const custBal=c=>c.ledger.reduce((s,t)=>(s+(t.dr||0)-(t.cr||0)),0);
+// Custom per-customer pricing: returns the price to charge THIS customer for THIS product right now.
+// Existing bills are unaffected because items store their own frozen price snapshot at order time.
+function effectivePrice(prod,custName){
+  const c=customers.find(x=>x.name===custName);
+  if(c&&c.customPrices&&c.customPrices[prod.key]!==undefined&&c.customPrices[prod.key]!==''&&c.customPrices[prod.key]!==null){
+    const v=parseFloat(c.customPrices[prod.key]);
+    if(!isNaN(v))return v;
+  }
+  return parseFloat(prod.price)||0;
+}
 
 // ── TOAST (replaces alert) ───────────────────────────────────────────────────
 let _toastTimer=null;
@@ -820,11 +913,12 @@ function showScreen(id){
 
 // ── MAIN NAV ──────────────────────────────────────────────────────────────────
 function mgo(t){
-  ['customers','prices','orders','bills'].forEach(id=>{
+  ['customers','prices','orders','bills','crates'].forEach(id=>{
     document.getElementById('mtab-'+id).classList.toggle('active',id===t);
     document.getElementById('mnb-'+id).classList.toggle('active',id===t);
   });
   if(t==='bills')renderBills();
+  if(t==='crates')renderCratesTab();
 }
 
 // ── CUSTOMERS ─────────────────────────────────────────────────────────────────
@@ -862,7 +956,7 @@ function renderCustomers(){
       <div class="cust-avatar" onclick="openLedger(${i})">${ini(c.name)}</div>
       <div class="cust-info" onclick="openLedger(${i})">
         <div class="cust-name">${c.name}</div>
-        <div class="cust-phone">${c.phone||'No phone'} · ${c.ledger.length} entries</div>
+        <div class="cust-phone">${c.phone?('+91 '+c.phone):'No phone'} · ${c.ledger.length} entries</div>
       </div>
       <span class="bal-chip ${chipClass}" onclick="openLedger(${i})">${chipTxt}</span>
       <span class="caret" onclick="openLedger(${i})">›</span>
@@ -941,7 +1035,71 @@ function openLedger(i){
   renderLedgerHeader();
   renderLedgerBal();
   renderTxnList();
+  renderCustPrices();
+  const cpList=document.getElementById('kb-custprice-list');
+  const cpChevron=document.getElementById('kb-custprice-chevron');
+  if(cpList)cpList.style.display='none';
+  if(cpChevron)cpChevron.style.transform='rotate(0deg)';
   showScreen('ledger');
+}
+
+// ── CUSTOM PRICES (per-customer price overrides) ─────────────────────────────
+function toggleCustPrices(){
+  const list=document.getElementById('kb-custprice-list');
+  const chevron=document.getElementById('kb-custprice-chevron');
+  if(!list)return;
+  const isOpen=list.style.display!=='none';
+  list.style.display=isOpen?'none':'';
+  if(chevron)chevron.style.transform=isOpen?'rotate(0deg)':'rotate(90deg)';
+}
+function renderCustPrices(){
+  const c=customers[activeCustIdx];
+  const el=document.getElementById('kb-custprice-list');
+  const cntEl=document.getElementById('kb-custprice-count');
+  if(!c||!el)return;
+  if(!c.customPrices) c.customPrices={};
+  if(!products.length){
+    el.innerHTML='<div class="empty-sub" style="padding:14px">No products yet — add them in the Prices tab.</div>';
+    if(cntEl)cntEl.textContent='0 custom';
+    return;
+  }
+  const customKeys=Object.keys(c.customPrices).filter(k=>c.customPrices[k]!==''&&c.customPrices[k]!=null);
+  if(cntEl)cntEl.textContent=customKeys.length+' custom';
+  el.innerHTML=products.map(p=>{
+    const def=parseFloat(p.price)||0;
+    const cur=c.customPrices[p.key];
+    const hasCustom=cur!==undefined&&cur!==''&&cur!==null;
+    return `<div class="price-row">
+      <div class="price-dot" style="background:${hasCustom?'var(--red)':'#0f0f10'}"></div>
+      <div class="price-label">
+        <div class="price-name">${p.name}</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+          <span class="price-unit">${p.unit}${p.unit?' · ':''}default ${fmt(def)}</span>
+        </div>
+      </div>
+      <div class="price-field">
+        <span>₹</span>
+        <input type="number" inputmode="decimal" min="0" step="0.5" value="${hasCustom?cur:''}" placeholder="${def||'—'}"
+          onchange="setCustomPrice('${p.key}',this.value)" aria-label="Custom price for ${p.name}">
+      </div>
+      ${hasCustom?`<button class="price-del-btn" onclick="clearCustomPrice('${p.key}')" title="Reset to default price">↺</button>`:''}
+    </div>`;
+  }).join('');
+}
+function setCustomPrice(key,val){
+  const c=customers[activeCustIdx];if(!c)return;
+  if(!c.customPrices) c.customPrices={};
+  const v=(val||'').trim();
+  if(v===''){delete c.customPrices[key];}
+  else c.customPrices[key]=v;
+  renderCustPrices();saveState();
+  showToast('Custom price updated for '+c.name+' — applies to new orders only.');
+}
+function clearCustomPrice(key){
+  const c=customers[activeCustIdx];if(!c||!c.customPrices)return;
+  delete c.customPrices[key];
+  renderCustPrices();saveState();
+  showToast('Reset to default price.');
 }
 
 function closeLedger(){showScreen('main');}
@@ -949,7 +1107,47 @@ function closeLedger(){showScreen('main');}
 function renderLedgerHeader(){
   const c=customers[activeCustIdx];
   document.getElementById('kb-name').textContent=c.name;
-  document.getElementById('kb-phone').textContent=c.phone||'No phone';
+  document.getElementById('kb-phone').textContent=c.phone?('+91 '+c.phone):'No WhatsApp number';
+}
+
+function sendWhatsAppSummary(){
+  const c=customers[activeCustIdx];
+  if(!c)return;
+  if(!c.phone||!/^\d{10}$/.test(c.phone)){
+    showToast('Add a valid 10-digit WhatsApp number for this customer (Edit).');
+    return;
+  }
+  const todayDate=parseAppDate(today());
+
+  // Today's orders — from confirmed bills for this customer, dated today
+  const todaysBills=bills.filter(b=>b.custName===c.name&&isSameDay(parseAppDate(b.date),todayDate));
+  let orderLines='';
+  if(todaysBills.length){
+    todaysBills.forEach(b=>{
+      b.items.forEach(i=>{ orderLines+=`• ${fmtQty(i.qty)} × ${i.prod.name} — ${fmt((parseFloat(i.prod.price)||0)*i.qty)}\n`; });
+      if(b.discount) orderLines+=`  (Discount: -${fmt(b.discount)}${b.discountDesc?' — '+b.discountDesc:''})\n`;
+    });
+    const todaysTotal=todaysBills.reduce((s,b)=>s+calcGrand(b),0);
+    orderLines+=`Today's Total: ${fmt(todaysTotal)}`;
+  } else {
+    orderLines='No order today.';
+  }
+
+  // Due amount till yesterday — ledger entries strictly before today
+  const dueTillYesterday=c.ledger.reduce((s,t)=>{
+    const d=parseAppDate(t.date);
+    if(d&&isSameDay(d,todayDate))return s; // skip today's entries
+    return s+(t.dr||0)-(t.cr||0);
+  },0);
+
+  const msg=
+`Namaste ${c.name},\n\n`+
+`*Today's Order:*\n${orderLines}\n\n`+
+`*Due amount (till yesterday):* ${fmt(Math.max(0,dueTillYesterday))}${dueTillYesterday<0?' (advance/credit)':''}\n\n`+
+`Please clear the due at your earliest convenience. Thank you!`;
+
+  const url='https://wa.me/91'+c.phone+'?text='+encodeURIComponent(msg);
+  window.open(url,'_blank');
 }
 
 function renderLedgerBal(){
@@ -1220,7 +1418,7 @@ function filterCustDropdown(q){
   document.getElementById('custComboList').innerHTML=custOptionHtml(list);
   const w=document.getElementById('custComboWrap');
   w.classList.add('open');setComboCardOverflow(w,true);
-  if(!q) selectedCustName='';
+  if(!q){selectedCustName='';renderProdQtyGrid();}
 }
 function openCustDropdown(){
   const list=customers.filter(c=>!c.booked);
@@ -1241,6 +1439,7 @@ function selectCustomer(name){
   selectedCustName=name;
   document.getElementById('custOrderSearch').value=name;
   closeCustDropdown();
+  renderProdQtyGrid(); // refresh prices in case this customer has custom prices
 }
 
 // Close customer dropdown when tapping outside
@@ -1270,11 +1469,12 @@ function renderProdQtyGrid(){
   }
   el.innerHTML=products.map((p,i)=>{
     const qty=prodQtys[p.key]||0;
-    const price=parseFloat(p.price)||0;
+    const price=effectivePrice(p,selectedCustName);
+    const isCustom=selectedCustName&&price!==(parseFloat(p.price)||0);
     return `<div class="pqg-row">
       <div class="pqg-info">
         <div class="pqg-name">${p.name}</div>
-        <div class="pqg-sub">${p.unit}${price?' · '+fmt(price):''}${qty?' · '+fmt(price*qty):''}</div>
+        <div class="pqg-sub">${p.unit}${price?' · '+fmt(price)+(isCustom?' (custom)':''):''}${qty?' · '+fmt(price*qty):''}</div>
       </div>
       <div class="pqg-stepper${qty?' active':''}">
         <button class="pqg-btn" onmousedown="event.preventDefault()" onclick="pqgStep('${p.key}',-0.5)">−</button>
@@ -1296,13 +1496,14 @@ function pqgStep(key,delta){
   const idx=products.findIndex(p=>p.key===key);
   if(idx>=0&&rows[idx]){
     const p=products[idx];
-    const price=parseFloat(p.price)||0;
+    const price=effectivePrice(p,selectedCustName);
+    const isCustom=selectedCustName&&price!==(parseFloat(p.price)||0);
     const stepper=rows[idx].querySelector('.pqg-stepper');
     const input=rows[idx].querySelector('.pqg-qty');
     const sub=rows[idx].querySelector('.pqg-sub');
     if(stepper) stepper.className='pqg-stepper'+(next?' active':'');
     if(input){input.value=next||'';input.className='pqg-qty'+(next?' nonzero':'');}
-    if(sub) sub.textContent=p.unit+(price?' · '+fmt(price):'')+(next?' · '+fmt(price*next):'');
+    if(sub) sub.textContent=p.unit+(price?' · '+fmt(price)+(isCustom?' (custom)':''):'')+(next?' · '+fmt(price*next):'');
   }
 }
 
@@ -1314,41 +1515,57 @@ function pqgSet(key,val){
   const idx=products.findIndex(p=>p.key===key);
   if(idx>=0&&rows[idx]){
     const p=products[idx];
-    const price=parseFloat(p.price)||0;
+    const price=effectivePrice(p,selectedCustName);
+    const isCustom=selectedCustName&&price!==(parseFloat(p.price)||0);
     const qty=prodQtys[key];
     const stepper=rows[idx].querySelector('.pqg-stepper');
     const input=rows[idx].querySelector('.pqg-qty');
     const sub=rows[idx].querySelector('.pqg-sub');
     if(stepper) stepper.className='pqg-stepper'+(qty?' active':'');
     if(input) input.className='pqg-qty'+(qty?' nonzero':'');
-    if(sub) sub.textContent=p.unit+(price?' · '+fmt(price):'')+(qty?' · '+fmt(price*qty):'');
+    if(sub) sub.textContent=p.unit+(price?' · '+fmt(price)+(isCustom?' (custom)':''):'')+(qty?' · '+fmt(price*qty):'');
   }
 }
 
 function updateBuilderSummary(){
   const items=products.filter(p=>(prodQtys[p.key]||0)>0);
-  const total=items.reduce((s,p)=>(parseFloat(p.price)||0)*(prodQtys[p.key]||0)+s,0);
+  const sub=items.reduce((s,p)=>effectivePrice(p,selectedCustName)*(prodQtys[p.key]||0)+s,0);
+  const discEl=document.getElementById('builderDiscountAmt');
+  const disc=Math.max(0,parseFloat(discEl&&discEl.value)||0);
+  const total=Math.max(0,sub-disc);
   const count=items.length;
   document.getElementById('builderCount').textContent=count+' item'+(count!==1?'s':'');
   const sumEl=document.getElementById('builderSummary');
   const totEl=document.getElementById('builderTotal');
   if(sumEl) sumEl.style.display=count?'block':'none';
-  if(totEl) totEl.textContent=fmt(total);
+  if(totEl) totEl.textContent=(disc>0?'Sub '+fmt(sub)+' → ':'')+fmt(total);
 }
 
 function commitOrder(){
   const cn=selectedCustName;
   if(!cn){showToast('Select a customer.');return;}
-  const items=products.filter(p=>(prodQtys[p.key]||0)>0).map(p=>({prod:p,qty:prodQtys[p.key]}));
+  // Snapshot each item's price at THIS customer's effective (custom or default) price.
+  // Because this is a frozen copy stored on the order/bill, later price changes never touch past bills.
+  const items=products.filter(p=>(prodQtys[p.key]||0)>0).map(p=>({prod:{...p,price:effectivePrice(p,cn)},qty:prodQtys[p.key]}));
   if(!items.length){showToast('Set quantity for at least one product.');return;}
+  const discAmt=Math.max(0,parseFloat(document.getElementById('builderDiscountAmt').value)||0);
+  const discDesc=document.getElementById('builderDiscountDesc').value.trim();
   let o=orders.find(x=>x.custName===cn);
-  if(o){items.forEach(bi=>{const ex=o.items.find(i=>i.prod.key===bi.prod.key);if(ex)ex.qty+=bi.qty;else o.items.push({...bi});});}
-  else orders.push({custName:cn,items,posted:false,date:today()});
+  if(o){
+    items.forEach(bi=>{const ex=o.items.find(i=>i.prod.key===bi.prod.key);if(ex)ex.qty+=bi.qty;else o.items.push({...bi});});
+    if(discAmt>0){o.discount=discAmt;o.discountDesc=discDesc;}
+  } else {
+    o={custName:cn,items,posted:false,date:today()};
+    if(discAmt>0){o.discount=discAmt;o.discountDesc=discDesc;}
+    orders.push(o);
+  }
   // Auto-mark customer as booked
   const cust=customers.find(c=>c.name===cn);
   if(cust) cust.booked=true;
   prodQtys={};renderProdQtyGrid();renderActiveOrders();renderCustomers();saveState();
   selectedCustName='';document.getElementById('custOrderSearch').value='';
+  document.getElementById('builderDiscountAmt').value='';
+  document.getElementById('builderDiscountDesc').value='';
   showToast('Order added for '+cn+' ✓ Marked as booked.');
 }
 function renderActiveOrders(){
@@ -1361,7 +1578,8 @@ function renderActiveOrders(){
     return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
       <div class="cust-avatar">${ini(o.custName)}</div>
       <div style="flex:1"><div style="font-size:13px;font-weight:700">${o.custName}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:2px">${o.items.map(i=>fmtQty(i.qty)+'× '+i.prod.sid).join(' · ')}</div></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">${o.items.map(i=>fmtQty(i.qty)+'× '+i.prod.sid).join(' · ')}</div>
+      ${o.discount?`<div style="font-size:11px;color:var(--green);margin-top:2px">Discount: -${fmt(o.discount)}${o.discountDesc?' ('+o.discountDesc+')':''}</div>`:''}</div>
       <div style="font-size:13px;font-weight:800;color:var(--red);white-space:nowrap">${fmt(total)}</div>
       <button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px" onclick="orders.splice(${oi},1);renderActiveOrders();saveState()">🗑️</button>
     </div>`;
@@ -1391,8 +1609,149 @@ function confirmOrder(){
   mgo('bills');renderBills();
 }
 
+// ── CRATES (delivered vs received back) ──────────────────────────────────────
+// Each customer keeps its own crateLedger[]: {id,date,given,received,note,returnDate}
+// received stays null/undefined until the return is confirmed (usually "the day after").
+function renderCratesTab(){
+  renderCrateCustSelect();
+  renderPendingCrateReturns();
+  renderCrateBalances();
+}
+
+function renderCrateCustSelect(){
+  const sel=document.getElementById('crateCustSelect');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Select customer…</option>'+customers.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  if(cur) sel.value=cur;
+}
+
+function logCrateGiven(){
+  const name=document.getElementById('crateCustSelect').value;
+  const qty=parseInt(document.getElementById('crateGivenInput').value,10);
+  const note=document.getElementById('crateGivenNote').value.trim();
+  if(!name){showToast('Select a customer.');return;}
+  if(!qty||qty<=0){showToast('Enter number of crates given.');return;}
+  const c=customers.find(x=>x.name===name);
+  if(!c)return;
+  if(!c.crateLedger) c.crateLedger=[];
+  c.crateLedger.push({id:'cr'+Date.now()+Math.random().toString(36).slice(2,6),date:today(),given:qty,received:null,note});
+  document.getElementById('crateGivenInput').value='';
+  document.getElementById('crateGivenNote').value='';
+  renderCratesTab();saveState();
+  showToast('Logged '+qty+' crate'+(qty!==1?'s':'')+' given to '+name+'.');
+}
+
+function pendingCrateEntries(){
+  const out=[];
+  customers.forEach(c=>{
+    (c.crateLedger||[]).forEach((e,ei)=>{
+      if(e.received===null||e.received===undefined) out.push({c,e,ei});
+    });
+  });
+  out.sort((a,b)=>(a.e.date<b.e.date?1:-1));
+  return out;
+}
+
+function renderPendingCrateReturns(){
+  const el=document.getElementById('pendingCratesList');
+  const cntEl=document.getElementById('pendingCrateCount');
+  if(!el)return;
+  const list=pendingCrateEntries();
+  if(cntEl) cntEl.textContent=list.length;
+  if(!list.length){
+    el.innerHTML='<div class="empty"><span class="empty-icon">📦</span><div class="empty-title">All caught up</div><div class="empty-sub">No pending crate returns.</div></div>';
+    return;
+  }
+  el.innerHTML=list.map(({c,e,ei})=>{
+    const safeName=c.name.replace(/[^a-zA-Z0-9]/g,'');
+    const inputId='crRecv_'+safeName+'_'+ei;
+    return `<div class="cust-row" style="align-items:center">
+      <div class="cust-avatar">${ini(c.name)}</div>
+      <div class="cust-info">
+        <div class="cust-name">${c.name}</div>
+        <div class="cust-phone">${e.date} · Given ${e.given}${e.note?' · '+e.note:''}</div>
+      </div>
+      <div class="price-field" style="width:56px">
+        <input type="number" min="0" step="1" inputmode="numeric" id="${inputId}" value="${e.given}">
+      </div>
+      <button class="btn-ghost-sm" onclick="confirmCrateReturn('${c.name.replace(/'/g,"\\'")}',${ei})">✓ Confirm</button>
+    </div>`;
+  }).join('');
+}
+
+function confirmCrateReturn(custName,ei){
+  const c=customers.find(x=>x.name===custName);
+  if(!c||!c.crateLedger||!c.crateLedger[ei])return;
+  const safeName=custName.replace(/[^a-zA-Z0-9]/g,'');
+  const inputEl=document.getElementById('crRecv_'+safeName+'_'+ei);
+  const val=Math.max(0,parseInt(inputEl&&inputEl.value,10)||0);
+  const given=c.crateLedger[ei].given;
+  c.crateLedger[ei].received=val;
+  c.crateLedger[ei].returnDate=today();
+  renderCratesTab();saveState();
+  const shortfall=given-val;
+  showToast(shortfall>0?c.name+': '+val+'/'+given+' crates back — '+shortfall+' short.':'All '+given+' crates returned ✓');
+}
+
+function crateBalance(c){
+  return (c.crateLedger||[]).reduce((s,e)=>s+(e.given||0)-(e.received||0),0);
+}
+
+function renderCrateBalances(){
+  const el=document.getElementById('crateBalanceList');
+  if(!el)return;
+  const withCrates=customers.filter(c=>(c.crateLedger||[]).length);
+  if(!withCrates.length){
+    el.innerHTML='<div class="empty-sub" style="padding:14px;text-align:center;color:var(--text3)">No crate activity yet.</div>';
+    return;
+  }
+  el.innerHTML=withCrates.map(c=>{
+    const bal=crateBalance(c);
+    const given=(c.crateLedger||[]).reduce((s,e)=>s+(e.given||0),0);
+    const received=(c.crateLedger||[]).reduce((s,e)=>s+(e.received||0),0);
+    let chipClass='chip-clear',chipTxt='All returned';
+    if(bal>0){chipClass='chip-owed';chipTxt=bal+' short';}
+    const safeName=c.name.replace(/'/g,"\\'");
+    return `<div class="cust-row">
+      <div class="cust-avatar">${ini(c.name)}</div>
+      <div class="cust-info">
+        <div class="cust-name">${c.name}</div>
+        <div class="cust-phone">Given ${given} · Received ${received}</div>
+      </div>
+      <span class="bal-chip ${chipClass}">${chipTxt}</span>
+      ${bal!==0?`<button class="price-del-btn" title="Clear this customer's crate balance" onclick="clearCrateBalance('${safeName}')">↺</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function clearCrateBalance(custName){
+  const c=customers.find(x=>x.name===custName);
+  if(!c)return;
+  const ok=await openConfirm('Clear crate balance for '+c.name+'? This marks all pending crates as fully returned.',{title:'Clear crate balance',okText:'Clear'});
+  if(!ok)return;
+  (c.crateLedger||[]).forEach(e=>{e.received=e.given;e.returnDate=e.returnDate||today();});
+  renderCratesTab();saveState();
+  showToast('Crate balance cleared for '+c.name+'.');
+}
+
+async function clearAllCrateBalances(){
+  const withCrates=customers.filter(c=>(c.crateLedger||[]).length&&crateBalance(c)!==0);
+  if(!withCrates.length){showToast('No pending crate balances.');return;}
+  const ok=await openConfirm('Clear crate balances for all '+withCrates.length+' customer(s)? This marks all pending crates as fully returned.',{title:'Clear all crate balances',okText:'Clear all'});
+  if(!ok)return;
+  withCrates.forEach(c=>{(c.crateLedger||[]).forEach(e=>{e.received=e.given;e.returnDate=e.returnDate||today();});});
+  renderCratesTab();saveState();
+  showToast('All crate balances cleared.');
+}
+
 // ── BILLS ────────────────────────────────────────────────────────────────────
-function calcGrand(o){return o.items.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);}
+function calcSubtotal(o){return o.items.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);}
+function calcGrand(o){
+  const sub=calcSubtotal(o);
+  const disc=Math.max(0,parseFloat(o.discount)||0);
+  return Math.round(Math.max(0,sub-disc)*100)/100;
+}
 
 function postBillToLedger(oi){
   const o=bills[oi];if(!o||o.posted)return;
@@ -1403,7 +1762,7 @@ function postBillToLedger(oi){
   cust.ledger.push({
     date:today(),dr:grand,
     items:o.items.map(i=>({sid:i.prod.sid,qty:i.qty})),
-    note:'Bill post',
+    note:'Bill post'+(o.discount?' — discount '+fmt(o.discount)+(o.discountDesc?': '+o.discountDesc:''):''),
     billId:o.billId
   });
   o.posted=true;
@@ -1428,7 +1787,9 @@ function renderBills(){
       manifest[p.key]=manifest[p.key]||{name:p.name,unit:p.unit,qty:0};
       manifest[p.key].qty+=item.qty;
     });
+    totalRev-=Math.max(0,parseFloat(o.discount)||0);
   });
+  totalRev=Math.max(0,totalRev);
 
   const stripHtml=`<div class="stat-strip">
     <div class="stat-pills-row">
@@ -1494,6 +1855,7 @@ function renderBills(){
         const price=parseFloat(item.prod.price)||0;
         return `<tr><td><span class="pname">${item.prod.name}</span><span class="psmall">${item.prod.unit}</span></td><td>${fmtQty(item.qty)}</td><td>${price?fmt(price):'—'}</td><td>${price?fmt(item.qty*price):'—'}</td></tr>`;
       }).join('');
+      const discRow=o.discount?`<tr><td colspan="3" style="color:var(--green)">Discount${o.discountDesc?' — '+o.discountDesc:''}</td><td style="color:var(--green)">-${fmt(o.discount)}</td></tr>`:'';
       const postBtn=o.posted
         ?`<button class="post-btn done" disabled>✅ Posted to Khatabook</button>`
         :`<button class="post-btn" onclick="postBillToLedger(${oi})">➕ Post bill to Khatabook</button>`;
@@ -1509,6 +1871,7 @@ function renderBills(){
           <table class="inv-table">
             <tr><th>Product</th><th>Qty</th><th>Rate</th><th>Total</th></tr>
             ${rows}
+            ${discRow}
             <tr class="tr-total"><td colspan="3">Grand total</td><td>${fmt(grand)}</td></tr>
           </table>
           <div class="inv-btn-row">${postBtn}<button class="bill-edit-btn" onclick="openEditBillModal(${oi})">✏️ Edit</button><button class="bill-del-btn" onclick="deleteBill(${oi})">🗑️</button></div>
@@ -1544,6 +1907,8 @@ function openEditBillModal(oi){
   editingBillItems=o.items.map(i=>({prod:i.prod,qty:i.qty}));
   editBillAddQtys={};
   document.getElementById('editBillCustName').textContent='— '+o.custName;
+  document.getElementById('editBillDiscountAmt').value=o.discount||'';
+  document.getElementById('editBillDiscountDesc').value=o.discountDesc||'';
   // Collapse the add section on open
   const sec=document.getElementById('editBillAddSection');
   const arr=document.getElementById('editBillAddArrow');
@@ -1608,9 +1973,10 @@ function renderEditBillAddGrid(){
     el.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--text3)">All products already in bill.</div>';
     return;
   }
+  const editBillCust=(bills[editingBillIdx]||{}).custName||'';
   el.innerHTML=addable.map(p=>{
     const qty=editBillAddQtys[p.key]||0;
-    const price=parseFloat(p.price)||0;
+    const price=effectivePrice(p,editBillCust);
     return `<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid var(--border)">
       <div style="flex:1;min-width:0">
         <div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
@@ -1647,12 +2013,13 @@ function ebAddSet(key,val){
   renderEditBillAddGrid();
 }
 function applyEditBillAdds(){
+  const editBillCust=(bills[editingBillIdx]||{}).custName||'';
   Object.entries(editBillAddQtys).forEach(([key,qty])=>{
     if(!qty)return;
     const prod=products.find(p=>p.key===key);if(!prod)return;
     const ex=editingBillItems.find(i=>i.prod.key===key);
     if(ex) ex.qty=Math.round((ex.qty+qty)*2)/2;
-    else editingBillItems.push({prod,qty});
+    else editingBillItems.push({prod:{...prod,price:effectivePrice(prod,editBillCust)},qty});
   });
   editBillAddQtys={};
   renderEditBillItems();
@@ -1670,7 +2037,10 @@ function rmEditBillItem(idx){
   renderEditBillAddGrid();
 }
 function updEditBillTotal(){
-  const grand=editingBillItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
+  const sub=editingBillItems.reduce((s,i)=>s+(parseFloat(i.prod.price)||0)*i.qty,0);
+  const discEl=document.getElementById('editBillDiscountAmt');
+  const disc=Math.max(0,parseFloat(discEl&&discEl.value)||0);
+  const grand=Math.max(0,sub-disc);
   document.getElementById('editBillGrandTotal').textContent=fmt(grand);
 }
 
@@ -1686,6 +2056,10 @@ function saveEditBill(){
   const oldGrand=calcGrand(o);
   const oldItems=o.items.map(i=>({...i})); // snapshot for manifest diff
   o.items=editingBillItems.map(i=>({prod:i.prod,qty:i.qty}));
+  const discAmt=Math.max(0,parseFloat(document.getElementById('editBillDiscountAmt').value)||0);
+  const discDesc=document.getElementById('editBillDiscountDesc').value.trim();
+  if(discAmt>0){o.discount=discAmt;o.discountDesc=discDesc;}
+  else{delete o.discount;delete o.discountDesc;}
   const newGrand=calcGrand(o);
 
   // ── Manifest: only update if this bill is within the current manifest window
@@ -1709,8 +2083,8 @@ function saveEditBill(){
       if(entry){
         entry.dr=Math.round(newGrand*100)/100;
         entry.items=o.items.map(i=>({sid:i.prod.sid||i.prod.key,qty:i.qty}));
-        // Update note to reflect edited bill
-        entry.note='Bill post (edited)';
+        // Update note to reflect edited bill (and any discount)
+        entry.note='Bill post (edited)'+(o.discount?' — discount '+fmt(o.discount)+(o.discountDesc?': '+o.discountDesc:''):'');
       }
     }
   }
@@ -1933,12 +2307,15 @@ async function shareBillPDF(oi){
       price?rs(price*item.qty):'—'
     ];
   });
+  const footRows=o.discount
+    ?[['','','Subtotal',rs(calcSubtotal(o))],['','','Discount'+(o.discountDesc?' ('+o.discountDesc+')':''),'-'+rs(o.discount)],['','','Grand Total',rs(grand)]]
+    :[['','','Grand Total',rs(grand)]];
 
   doc.autoTable({
     startY:60,
     head:[['Product','Qty','Rate','Total']],
     body:rows,
-    foot:[['','','Grand Total',rs(grand)]],
+    foot:footRows,
     styles:{fontSize:9,cellPadding:3,font:'helvetica'},
     headStyles:{fillColor:[232,25,44],textColor:255,fontStyle:'bold',fontSize:8.5},
     footStyles:{fillColor:[255,240,240],textColor:[232,25,44],fontStyle:'bold',fontSize:10},
