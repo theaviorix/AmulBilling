@@ -580,8 +580,9 @@ details[open] .sum-chev{transform:rotate(180deg)}
     </div>
     <button class="kb-wa-btn" onclick="sendWhatsAppSummary()">📲 Send Today's Order + Due on WhatsApp</button>
 
-    <!-- CUSTOM PRICES FOR THIS CUSTOMER -->
-    <div style="padding:0 16px 14px">
+    <!-- TRANSACTIONS -->
+    <div class="kb-txn-section">
+      <!-- CUSTOM PRICES FOR THIS CUSTOMER -->
       <div class="card">
         <div class="card-hdr" style="cursor:pointer" onclick="toggleCustPrices()">
           <div class="chdr-icon" style="background:var(--red-l)">🏷️</div>
@@ -591,10 +592,7 @@ details[open] .sum-chev{transform:rotate(180deg)}
         </div>
         <div id="kb-custprice-list" style="display:none"></div>
       </div>
-    </div>
 
-    <!-- TRANSACTIONS -->
-    <div class="kb-txn-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="kb-txn-label" style="margin-bottom:0">Transaction History</div>
         <button class="kb-share-stmt-btn" onclick="openStmtDateModal()">📤 Statement</button>
@@ -1119,7 +1117,7 @@ function sendWhatsAppSummary(){
   }
   const todayDate=parseAppDate(today());
 
-  // Today's orders — from confirmed bills for this customer, dated today
+  // Today's orders — from confirmed bills for this customer, dated today (items + qty + price only, no total)
   const todaysBills=bills.filter(b=>b.custName===c.name&&isSameDay(parseAppDate(b.date),todayDate));
   let orderLines='';
   if(todaysBills.length){
@@ -1127,23 +1125,18 @@ function sendWhatsAppSummary(){
       b.items.forEach(i=>{ orderLines+=`• ${fmtQty(i.qty)} × ${i.prod.name} — ${fmt((parseFloat(i.prod.price)||0)*i.qty)}\n`; });
       if(b.discount) orderLines+=`  (Discount: -${fmt(b.discount)}${b.discountDesc?' — '+b.discountDesc:''})\n`;
     });
-    const todaysTotal=todaysBills.reduce((s,b)=>s+calcGrand(b),0);
-    orderLines+=`Today's Total: ${fmt(todaysTotal)}`;
+    orderLines=orderLines.trim();
   } else {
     orderLines='No order today.';
   }
 
-  // Due amount till yesterday — ledger entries strictly before today
-  const dueTillYesterday=c.ledger.reduce((s,t)=>{
-    const d=parseAppDate(t.date);
-    if(d&&isSameDay(d,todayDate))return s; // skip today's entries
-    return s+(t.dr||0)-(t.cr||0);
-  },0);
+  // Total amount due — the full khatabook balance (regardless of today's order)
+  const totalDue=custBal(c);
 
   const msg=
 `Namaste ${c.name},\n\n`+
 `*Today's Order:*\n${orderLines}\n\n`+
-`*Due amount (till yesterday):* ${fmt(Math.max(0,dueTillYesterday))}${dueTillYesterday<0?' (advance/credit)':''}\n\n`+
+`💰 *TOTAL AMOUNT TO BE PAID: ${fmt(Math.max(0,totalDue))}*${totalDue<0?' (advance/credit)':''}\n\n`+
 `Please clear the due at your earliest convenience. Thank you!`;
 
   const url='https://wa.me/91'+c.phone+'?text='+encodeURIComponent(msg);
